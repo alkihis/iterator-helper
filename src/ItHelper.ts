@@ -1,3 +1,5 @@
+const IteratorSlot = Symbol('IteratorSlot');
+
 export function aiter<T>(item: AsyncIterator<T> | AsyncIterator<T>) {
   if (Symbol.asyncIterator in item) {
     // @ts-expect-error
@@ -7,20 +9,25 @@ export function aiter<T>(item: AsyncIterator<T> | AsyncIterator<T>) {
 }
 
 export class HAsyncIterator<T> implements AsyncIterator<T> {
-  constructor(protected iterator: AsyncIterator<T>) {}
+  [IteratorSlot]: AsyncIterator<T>;
+
+  constructor(iterator?: AsyncIterator<T>) {
+    this[IteratorSlot] = iterator ?? this;
+  }
 
   next(val?: any) {
-    return this.iterator.next(val);
+    return this[IteratorSlot].next(val);
   }
 
   throw(val?: any) {
-    return this.iterator.throw?.(val) ?? Promise.resolve({ value: undefined, done: true });
+    return this[IteratorSlot].throw?.(val) ?? Promise.resolve({ value: undefined, done: true });
   }
   
   return(val?: any) {
-    return this.iterator.return?.(val) ?? Promise.resolve({ value: undefined, done: true });
+    return this[IteratorSlot].return?.(val) ?? Promise.resolve({ value: undefined, done: true });
   }
 
+  /** Map each value of iterator to another value via {callback}. */
   map<R>(callback: (value: T) => R) : HAsyncIterator<R> {
     return new HAsyncIterator(HAsyncIterator.map.call(this, callback as any)) as HAsyncIterator<R>;
   }
@@ -38,6 +45,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return value.value;
   }
 
+  /** Each value is given through {callback}, return `true` if value is needed into returned iterator. */
   filter(callback: (value: T) => boolean) : HAsyncIterator<T> {
     return new HAsyncIterator(HAsyncIterator.filter.call(this, callback as any)) as HAsyncIterator<T>;
   }
@@ -60,6 +68,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return value.value;
   }
 
+  /** Find a specific value that returns `true` in {callback}, and return it. Returns `undefined` otherwise. */
   async find(callback: (value: T) => boolean) {
     const it = this;
     let value = await it.next();
@@ -74,6 +83,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     }
   }
 
+  /** Return `true` if each value of iterator validate {callback}. */
   async every(callback: (value: T) => boolean) {
     const it = this;
     let value = await it.next();
@@ -90,6 +100,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return true;
   }
 
+  /** Return `true` if one value of iterator validate {callback}. */
   async some(callback: (value: T) => boolean) {
     const it = this;
     let value = await it.next();
@@ -106,6 +117,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return false;
   }
 
+  /** Consume iterator and collapse values inside an array. */
   async toArray(max_count = Infinity) {
     const values = [];
 
@@ -129,6 +141,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return values;
   }
 
+  /** Create a new iterator that consume {limit} items, then stops. */
   take(limit: number) : HAsyncIterator<T> {
     return new HAsyncIterator(HAsyncIterator.take.call(this, limit)) as HAsyncIterator<T>;
   }
@@ -157,6 +170,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return value.value;
   }
 
+  /** Create a new iterator that skip {limit} items from source iterator, then yield all values. */
   drop(limit: number) : HAsyncIterator<T> {
     return new HAsyncIterator(HAsyncIterator.drop.call(this, limit)) as HAsyncIterator<T>;
   }
@@ -188,6 +202,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return value.value;
   }
 
+  /** Get a pair [index, value] for each remaining value of iterable. */
   asIndexedPairs() : HAsyncIterator<[number, T]> {
     return new HAsyncIterator(HAsyncIterator.asIndexedPairs.call(this)) as HAsyncIterator<[number, T]>;
   }
@@ -208,6 +223,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return value.value;
   }
 
+  /** Like map, but you can return a new iterator that will be flattened. */
   flatMap<R>(mapper: (value: T) => AsyncIterator<R> | R) : HAsyncIterator<R> {
     return new HAsyncIterator(HAsyncIterator.flatMap.call(this, mapper as any)) as HAsyncIterator<R>;
   }
@@ -243,6 +259,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return value.value;
   }
 
+  /** Accumulate each item inside **acc** for each value **value**. */
   async reduce<V>(reducer: (acc: V, value: T) => V, initial_value?: V) {
     let acc = initial_value;
 
@@ -258,6 +275,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return acc;
   }
 
+  /** Iterate over each value of iterator by calling **callback** for each value. */
   async forEach(callback: (value: T) => any) {
     const it = this;
     let value = await it.next();
@@ -271,6 +289,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     }
   }
 
+  /** Join all the remaining elements of the iterator in a single string with glue {glue}. */
   async join(string: string) {
     let final = '';
     let first = true;
@@ -295,6 +314,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return final;
   }
 
+  /** End the iterator and return the number of remaining items. */
   async count() {
     let count = 0;
 
@@ -310,6 +330,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return count;
   }
 
+  /** Iterate through current iterator, then through the given iterators in the correct order. */
   chain<I>(...iterables: AsyncIterableIterator<I>[]) : HAsyncIterator<T | I> {
     return new HAsyncIterator(HAsyncIterator.chain.call(this, ...iterables)) as HAsyncIterator<T | I>;
   }
@@ -322,6 +343,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     }
   }
 
+  /** Iterate through multiple iterators together. */
   zip<O>(...others: AsyncIterableIterator<O>[]) : HAsyncIterator<(T | O)[]> {
     return new HAsyncIterator(HAsyncIterator.zip.call(this, ...others)) as HAsyncIterator<(T | O)[]>;
   }
@@ -336,6 +358,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     }
   }
 
+  /** Continue iterator until {callback} return a falsy value. */
   takeWhile(callback: (value: T) => boolean) : HAsyncIterator<T> {
     return new HAsyncIterator(HAsyncIterator.takeWhile.call(this, callback as any)) as HAsyncIterator<T>;
   }
@@ -361,6 +384,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return value.value;
   }
 
+  /** Skip elements until {callback} return a truthy value. */
   dropWhile(callback: (value: T) => boolean) : HAsyncIterator<T> {
     return new HAsyncIterator(HAsyncIterator.dropWhile.call(this, callback as any)) as HAsyncIterator<T>;
   }
@@ -387,6 +411,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return value.value;
   }
 
+  /** Continue iterator until `null` or `undefined` is encountered. */
   fuse() : HAsyncIterator<T> {
     return new HAsyncIterator(HAsyncIterator.fuse.call(this)) as HAsyncIterator<T>;
   }
@@ -412,6 +437,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return value.value;
   }
 
+  /** Partition {true} elements to first array, {false} elements to second one. */
   async partition(callback: (value: T) => boolean) {
     const partition1 = [], partition2 = [];
 
@@ -432,6 +458,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return [partition1, partition2];
   }
 
+  /** Find the iterator index of the first element that returns a truthy value, -1 otherwise. */
   async findIndex(callback: (value: T) => boolean) {
     const it = this;
     let value = await it.next();
@@ -450,6 +477,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return -1;
   } 
 
+  /** Only works if it. is a number iterator. Returns the maximum of iterator. */
   async max() {
     let max = -Infinity;
 
@@ -468,6 +496,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return max;
   }
 
+  /** Only works if it. is a number iterator. Returns the minimum of iterator. */
   async min() {
     let min = Infinity;
 
@@ -486,6 +515,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return min;
   }
 
+  /** When iterator ends, go back to the first item then loop. Indefinitively. */
   cycle() : HAsyncIterator<T> {
     return new HAsyncIterator(HAsyncIterator.cycle.call(this)) as HAsyncIterator<T>;
   }
@@ -525,20 +555,25 @@ export function iter<T>(item: Iterator<T> | Iterable<T>) {
 }
 
 export class HIterator<T> implements Iterator<T> {
-  constructor(protected iterator: Iterator<T>) {}
+  [IteratorSlot]: Iterator<T>;
+
+  constructor(iterator?: Iterator<T>) {
+    this[IteratorSlot] = iterator ?? this;
+  }
 
   next(val?: any) {
-    return this.iterator.next(val);
+    return this[IteratorSlot].next(val);
   }
 
   throw(val?: any) {
-    return this.iterator.throw?.(val) ?? { value: undefined, done: true };
+    return this[IteratorSlot].throw?.(val) ?? { value: undefined, done: true };
   }
   
   return(val?: any) {
-    return this.iterator.return?.(val) ?? { value: undefined, done: true };
+    return this[IteratorSlot].return?.(val) ?? { value: undefined, done: true };
   }
 
+  /** Map each value of iterator to another value via {callback}. */
   map<R>(callback: (element: T) => R) : HIterator<T> {
     return new HIterator(HIterator.map.call(this, callback as any)) as HIterator<T>;
   }
@@ -556,6 +591,7 @@ export class HIterator<T> implements Iterator<T> {
     return value.value;
   }
 
+  /** Each value is given through {callback}, return `true` if value is needed into returned iterator. */
   filter(callback: (value: T) => boolean) : HIterator<T> {
     return new HIterator(HIterator.filter.call(this, callback as any)) as HIterator<T>;
   }
@@ -579,6 +615,7 @@ export class HIterator<T> implements Iterator<T> {
     return value.value;
   }
 
+  /** Find a specific value that returns `true` in {callback}, and return it. Returns `undefined` otherwise. */
   find(callback: (value: T) => boolean) {
     const it = this;
     let value = it.next();
@@ -593,6 +630,7 @@ export class HIterator<T> implements Iterator<T> {
     }
   }
 
+  /** Return `true` if each value of iterator validate {callback}. */
   every(callback: (value: T) => boolean) {
     const it = this;
     let value = it.next();
@@ -609,6 +647,7 @@ export class HIterator<T> implements Iterator<T> {
     return true;
   }
 
+  /** Return `true` if one value of iterator validate {callback}. */
   some(callback: (value: T) => boolean) {
     const it = this;
     let value = it.next();
@@ -625,6 +664,7 @@ export class HIterator<T> implements Iterator<T> {
     return false;
   }
 
+  /** Consume iterator and collapse values inside an array. */
   toArray(max_count = Infinity) {
     const values = [];
 
@@ -648,6 +688,7 @@ export class HIterator<T> implements Iterator<T> {
     return values;
   }
 
+  /** Create a new iterator that consume {limit} items, then stops. */
   take(limit: number) : HIterator<T> {
     limit = Number(limit);
     if (limit < 0)
@@ -676,6 +717,7 @@ export class HIterator<T> implements Iterator<T> {
     return value.value;
   }
 
+  /** Create a new iterator that skip {limit} items from source iterator, then yield all values. */
   drop(limit: number) : HIterator<T> {
     limit = Number(limit);
     if (limit < 0)
@@ -706,6 +748,7 @@ export class HIterator<T> implements Iterator<T> {
     return value.value;
   }
 
+  /** Get a pair [index, value] for each remaining value of iterable. */
   asIndexedPairs() : HIterator<[number, T]> {
     return new HIterator(HIterator.asIndexedPairs.call(this)) as HIterator<[number, T]>;
   }
@@ -725,6 +768,7 @@ export class HIterator<T> implements Iterator<T> {
     return value.value;
   }
 
+  /** Like map, but you can return a new iterator that will be flattened. */
   flatMap<R>(mapper: (value: T) => IterableIterator<R> | R) : HIterator<R> {
     if (typeof mapper !== 'function') {
       throw new TypeError('Mapper must be a function.');
@@ -757,6 +801,7 @@ export class HIterator<T> implements Iterator<T> {
     return value.value;
   }
 
+  /** Accumulate each item inside **acc** for each value **value**. */
   reduce<V>(reducer: (acc: V, value: T) => V, initial_value?: V) {
     let acc = initial_value;
 
@@ -777,6 +822,7 @@ export class HIterator<T> implements Iterator<T> {
     return acc;
   }
 
+  /** Iterate over each value of iterator by calling **callback** for each value. */
   forEach(callback: (value: T) => any) {
     const it = this;
     let value = it.next();
@@ -790,6 +836,7 @@ export class HIterator<T> implements Iterator<T> {
     }
   }
 
+  /** End the iterator and return the number of remaining items. */
   count() {
     let count = 0;
 
@@ -804,6 +851,7 @@ export class HIterator<T> implements Iterator<T> {
     return count;
   }
 
+  /** Join all the remaining elements of the iterator in a single string with glue {glue}. */
   join(string: string) {
     let final = '';
     let first = true;
@@ -828,6 +876,7 @@ export class HIterator<T> implements Iterator<T> {
     return final;
   }
   
+  /** Iterate through current iterator, then through the given iterators in the correct order. */
   chain<I>(...iterables: IterableIterator<I>[]) : HIterator<T | I> {
     return new HIterator(HIterator.chain.apply(this, iterables)) as HIterator<T | I>;
   }
@@ -840,6 +889,7 @@ export class HIterator<T> implements Iterator<T> {
     }
   }
 
+  /** Iterate through multiple iterators together. */
   zip<O>(...others: IterableIterator<O>[]) : HIterator<(T | O)[]> {
     return new HIterator(HIterator.zip.apply(this, others)) as HIterator<(T | O)[]>;
   }
@@ -855,6 +905,7 @@ export class HIterator<T> implements Iterator<T> {
     }
   }
 
+  /** Continue iterator until {callback} return a falsy value. */
   takeWhile(callback: (value: T) => boolean) : HIterator<T> {
     return new HIterator(HIterator.takeWhile.call(this, callback as any)) as HIterator<T>;
   }
@@ -878,6 +929,7 @@ export class HIterator<T> implements Iterator<T> {
     return value.value;
   }
 
+  /** Skip elements until {callback} return a truthy value. */
   dropWhile(callback: (value: T) => boolean) : HIterator<T> {
     return new HIterator(HIterator.dropWhile.call(this, callback as any)) as HIterator<T>;
   }
@@ -905,6 +957,7 @@ export class HIterator<T> implements Iterator<T> {
     return value.value;
   }
 
+  /** Continue iterator until `null` or `undefined` is encountered. */
   fuse() : HIterator<T> {
     return new HIterator(HIterator.fuse.call(this)) as HIterator<T>;
   }
@@ -928,6 +981,7 @@ export class HIterator<T> implements Iterator<T> {
     return value.value;
   }
 
+  /** Partition {true} elements to first array, {false} elements to second one. */
   partition(callback: (value: T) => boolean) {
     const partition1 = [], partition2 = [];
 
@@ -945,9 +999,10 @@ export class HIterator<T> implements Iterator<T> {
       value = it.next();
     }
 
-    return [partition1, partition2];
+    return [partition1, partition2] as [T[], T[]];
   }
 
+  /** Find the iterator index of the first element that returns a truthy value, -1 otherwise. */
   findIndex(callback: (value: T) => boolean) {
     const it = this;
     let i = 0;
@@ -966,6 +1021,7 @@ export class HIterator<T> implements Iterator<T> {
     return -1;
   } 
 
+  /** Only works if it. is a number iterator. Returns the maximum of iterator. */
   max() {
     let max = -Infinity;
 
@@ -984,6 +1040,7 @@ export class HIterator<T> implements Iterator<T> {
     return max;
   }
 
+  /** Only works if it. is a number iterator. Returns the minimum of iterator. */
   min() {
     let min = Infinity;
 
@@ -1002,6 +1059,7 @@ export class HIterator<T> implements Iterator<T> {
     return min;
   }
 
+  /** When iterator ends, go back to the first item then loop. Indefinitively. */
   cycle() : HIterator<T> {
     return new HIterator(HIterator.cycle.call(this)) as HIterator<T>;
   }
