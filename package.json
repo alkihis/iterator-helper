@@ -1,13 +1,17 @@
 {
   "name": "iterator-helper",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
     "test": "node dist/test.js"
   },
   "keywords": [
-    "iterator", "iterators", "polyfill", "helpers", "itertools"
+    "iterator",
+    "iterators",
+    "polyfill",
+    "helpers",
+    "itertools"
   ],
   "author": "Louis Béranger",
   "repository": {
