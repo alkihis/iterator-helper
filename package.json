@@ -6,11 +6,13 @@
   "scripts": {
     "test": "node dist/test.js"
   },
-  "keywords": [],
+  "keywords": [
+    "iterator", "iterators", "polyfill", "helpers", "itertools"
+  ],
   "author": "Louis Béranger",
   "repository": {
     "type": "git",
-    "url": "https://github.com/alkihis/iterator-polyfill"
+    "url": "https://github.com/alkihis/iterator-helper"
   },
   "license": "ISC",
   "devDependencies": {
