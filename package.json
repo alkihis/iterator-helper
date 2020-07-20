@@ -1,0 +1,19 @@
+{
+  "name": "iterator-helper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "node dist/test.js"
+  },
+  "keywords": [],
+  "author": "Louis Béranger",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alkihis/iterator-polyfill"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^14.0.13"
+  }
+}
