@@ -44,16 +44,16 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Map each value of iterator to another value via {callback}. */
-  map<R>(callback: (value: T) => R) : HAsyncIterator<R> {
+  map<R>(callback: (value: T) => R | PromiseLike<R>) : HAsyncIterator<R> {
     return new HAsyncIterator(HAsyncIterator.map.call(this, callback as any)) as HAsyncIterator<R>;
   }
 
-  static async *map<T, R>(this: AsyncIterator<T>, callback: (value: T) => R) {
+  static async *map<T, R>(this: AsyncIterator<T>, callback: (value: T) => R | PromiseLike<R>) {
     const it = this;
     let value = await it.next();
 
     while (!value.done) {
-      const real_value = callback(value.value);
+      const real_value = await callback(value.value);
       const next_value = yield real_value;
       value = await it.next(next_value);
     }
@@ -62,11 +62,11 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Each value is given through {callback}, return `true` if value is needed into returned iterator. */
-  filter(callback: (value: T) => boolean) : HAsyncIterator<T> {
+  filter(callback: (value: T) => boolean | PromiseLike<boolean>) : HAsyncIterator<T> {
     return new HAsyncIterator(HAsyncIterator.filter.call(this, callback as any)) as HAsyncIterator<T>;
   }
 
-  static async *filter<T>(this: AsyncIterator<T>, callback: (value: T) => boolean) {
+  static async *filter<T>(this: AsyncIterator<T>, callback: (value: T) => boolean | PromiseLike<boolean>) {
     const it = this;
     let value = await it.next();
     let next_value;
@@ -74,7 +74,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     while (!value.done) {
       const real_value = value.value;
 
-      if (callback(real_value)) {
+      if (await callback(real_value)) {
         next_value = yield real_value;
       }
 
@@ -85,14 +85,14 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Find a specific value that returns `true` in {callback}, and return it. Returns `undefined` otherwise. */
-  async find(callback: (value: T) => boolean) {
+  async find(callback: (value: T) => boolean | PromiseLike<boolean>) {
     const it = this;
     let value = await it.next();
 
     while (!value.done) {
       const real_value = value.value;
 
-      if (callback(real_value))
+      if (await callback(real_value))
         return real_value;
 
       value = await it.next();
@@ -100,14 +100,14 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Return `true` if each value of iterator validate {callback}. */
-  async every(callback: (value: T) => boolean) {
+  async every(callback: (value: T) => boolean | PromiseLike<boolean>) {
     const it = this;
     let value = await it.next();
 
     while (!value.done) {
       const real_value = value.value;
 
-      if (!callback(real_value))
+      if (!await callback(real_value))
         return false;
 
       value = await it.next();
@@ -117,14 +117,14 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Return `true` if one value of iterator validate {callback}. */
-  async some(callback: (value: T) => boolean) {
+  async some(callback: (value: T) => boolean | PromiseLike<boolean>) {
     const it = this;
     let value = await it.next();
 
     while (!value.done) {
       const real_value = value.value;
 
-      if (callback(real_value))
+      if (await callback(real_value))
         return true;
 
       value = await it.next();
@@ -240,11 +240,11 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Like map, but you can return a new iterator that will be flattened. */
-  flatMap<R>(mapper: (value: T) => AsyncIterator<R> | R) : HAsyncIterator<R> {
+  flatMap<R>(mapper: (value: T) => AsyncIterator<R> | R | PromiseLike<AsyncIterator<R>> | PromiseLike<R>) : HAsyncIterator<R> {
     return new HAsyncIterator(HAsyncIterator.flatMap.call(this, mapper as any)) as HAsyncIterator<R>;
   }
 
-  static async *flatMap<T, R>(this: AsyncIterator<T>, mapper: (value: T) => AsyncIterator<R> | R) {
+  static async *flatMap<T, R>(this: AsyncIterator<T>, mapper: (value: T) => AsyncIterator<R> | R | PromiseLike<AsyncIterator<R>> | PromiseLike<R>) {
     if (typeof mapper !== 'function') {
       throw new TypeError('Mapper must be a function.');
     }
@@ -255,7 +255,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
 
     while (!value.done) {
       const real_value = value.value;
-      const mapped = mapper(real_value);
+      const mapped = await mapper(real_value);
 
       if (Symbol.asyncIterator in mapped) {
         // @ts-ignore
@@ -276,7 +276,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Accumulate each item inside **acc** for each value **value**. */
-  async reduce<V>(reducer: (acc: V, value: T) => V, initial_value?: V) {
+  async reduce<V>(reducer: (acc: V, value: T) => V | PromiseLike<V>, initial_value?: V) {
     let acc = initial_value;
 
     const it = this;
@@ -285,21 +285,21 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     }
 
     for await (const value of it) {
-      acc = reducer(acc!, value);
+      acc = await reducer(acc!, value);
     }
 
     return acc;
   }
 
   /** Iterate over each value of iterator by calling **callback** for each value. */
-  async forEach(callback: (value: T) => any) {
+  async forEach(callback: (value: T) => any | PromiseLike<any>) {
     const it = this;
     let value = await it.next();
 
     while (!value.done) {
       const real_value = value.value;
 
-      callback(real_value);
+      await callback(real_value);
 
       value = await it.next();
     }
@@ -375,11 +375,11 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Continue iterator until {callback} return a falsy value. */
-  takeWhile(callback: (value: T) => boolean) : HAsyncIterator<T> {
+  takeWhile(callback: (value: T) => boolean | PromiseLike<boolean>) : HAsyncIterator<T> {
     return new HAsyncIterator(HAsyncIterator.takeWhile.call(this, callback as any)) as HAsyncIterator<T>;
   }
 
-  static async *takeWhile<T>(this: AsyncIterator<T>, callback: (value: T) => boolean) {
+  static async *takeWhile<T>(this: AsyncIterator<T>, callback: (value: T) => boolean | PromiseLike<boolean>) {
     const it = this;
     let value = await it.next();
     let next_value;
@@ -387,7 +387,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     while (!value.done) {
       const real_value = value.value;
 
-      if (callback(real_value)) {
+      if (await callback(real_value)) {
         next_value = yield real_value;
       }
       else {
@@ -401,11 +401,11 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Skip elements until {callback} return a truthy value. */
-  dropWhile(callback: (value: T) => boolean) : HAsyncIterator<T> {
+  dropWhile(callback: (value: T) => boolean | PromiseLike<boolean>) : HAsyncIterator<T> {
     return new HAsyncIterator(HAsyncIterator.dropWhile.call(this, callback as any)) as HAsyncIterator<T>;
   }
 
-  static async *dropWhile<T>(this: AsyncIterator<T>, callback: (value: T) => boolean) {
+  static async *dropWhile<T>(this: AsyncIterator<T>, callback: (value: T) => boolean | PromiseLike<boolean>) {
     const it = this;
     let value = await it.next();
     let next_value;
@@ -414,7 +414,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     while (!value.done) {
       const real_value = value.value;
 
-      if (!finished && callback(real_value)) {
+      if (!finished && await callback(real_value)) {
         value = await it.next(next_value);
         continue;
       }
@@ -454,7 +454,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Partition {true} elements to first array, {false} elements to second one. */
-  async partition(callback: (value: T) => boolean) {
+  async partition(callback: (value: T) => boolean | PromiseLike<boolean>) {
     const partition1 = [], partition2 = [];
 
     const it = this;
@@ -463,7 +463,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     while (!value.done) {
       const real_value = value.value;
 
-      if (callback(real_value))
+      if (await callback(real_value))
         partition1.push(real_value);
       else
         partition2.push(real_value);
@@ -475,7 +475,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Find the iterator index of the first element that returns a truthy value, -1 otherwise. */
-  async findIndex(callback: (value: T) => boolean) {
+  async findIndex(callback: (value: T) => boolean | PromiseLike<boolean>) {
     const it = this;
     let value = await it.next();
     let i = 0;
@@ -483,7 +483,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     while (!value.done) {
       const real_value = value.value;
 
-      if (callback(real_value))
+      if (await callback(real_value))
         return i;
 
       value = await it.next();

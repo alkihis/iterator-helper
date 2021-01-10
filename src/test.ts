@@ -2,20 +2,20 @@ import './index';
 import * as assert from 'assert';
 import { iter, aiter, wrap, awrap } from './ItHelper';
 
-function* numbers() {
+function* numbers(): Iterator<number> {
   yield 1;
   yield 2;
   yield 3;
 }
 
-function* dropWhileCompatible() {
+function* dropWhileCompatible(): Iterator<number> {
   yield 1;
   yield 2;
   yield 3;
   yield 1;
 }
 
-function* takeWhileCompatible() {
+function* takeWhileCompatible(): Iterator<number> {
   yield 1;
   yield 2;
   yield 4;
@@ -23,7 +23,7 @@ function* takeWhileCompatible() {
   yield 1;
 }
 
-function* fuseCompatible() {
+function* fuseCompatible(): Iterator<number | undefined> {
   yield 1;
   yield 2;
   yield 3;
@@ -31,20 +31,20 @@ function* fuseCompatible() {
   yield 5;
 }
 
-async function* asyncNumbers() {
+async function* asyncNumbers(): AsyncIterator<number> {
   yield 1;
   yield 2;
   yield 3;
 }
 
-async function* asyncDropWhileCompatible() {
+async function* asyncDropWhileCompatible(): AsyncIterator<number> {
   yield 1;
   yield 2;
   yield 3;
   yield 1;
 }
 
-async function* asyncTakeWhileCompatible() {
+async function* asyncTakeWhileCompatible(): AsyncIterator<number> {
   yield 1;
   yield 2;
   yield 4;
@@ -52,7 +52,7 @@ async function* asyncTakeWhileCompatible() {
   yield 1;
 }
 
-async function* asyncFuseCompatible() {
+async function* asyncFuseCompatible(): AsyncIterator<number | undefined> {
   yield 1;
   yield 2;
   yield 3;
@@ -155,8 +155,10 @@ async function main() {
   // ASYNC ITERATOR TESTS
   // .map
   assert.deepStrictEqual(await an().map(e => e * 2).toArray(), [2, 4, 6]);
+  assert.deepStrictEqual(await an().map(async e => e * 2).toArray(), [2, 4, 6]);
   // .filter
   assert.deepStrictEqual(await an().filter(e => e % 2 === 0).toArray(), [2]);
+  assert.deepStrictEqual(await an().filter(async e => e % 2 === 0).toArray(), [2]);
   // .take
   assert.deepStrictEqual(await an().take(2).toArray(), [1, 2]);
   // .drop
@@ -165,23 +167,32 @@ async function main() {
   assert.deepStrictEqual(await an().asIndexedPairs().toArray(), [[0, 1], [1, 2], [2, 3]]);
   // .flatMap
   assert.deepStrictEqual(await an().flatMap(e => [e, -e]).toArray(), [1, -1, 2, -2, 3, -3]);
+  assert.deepStrictEqual(await an().flatMap(async e => [e, -e]).toArray(), [1, -1, 2, -2, 3, -3]);
   // .find
   assert.deepStrictEqual(await an().find(e => e === 2), 2);
-  assert.strictEqual(await an().find((e: number) => e === 4), undefined);
+  assert.strictEqual(await an().find(async (e: number) => e === 4), undefined);
   // .every
   assert.strictEqual(await an().every(e => e > 0), true);
   assert.strictEqual(await an().every(e => e <= 2), false);
+  assert.strictEqual(await an().every(async e => e > 0), true);
+  assert.strictEqual(await an().every(async e => e <= 2), false);
   // .some
   assert.strictEqual(await an().some(e => e <= 2), true);
   assert.strictEqual(await an().some(e => e <= 0), false);
+  assert.strictEqual(await an().some(async e => e <= 2), true);
+  assert.strictEqual(await an().some(async e => e <= 0), false);
   // .toArray
   assert.deepStrictEqual(await an().toArray(), [1, 2, 3]);
   // .reduce
   assert.deepStrictEqual(await an().reduce((acc: number, val) => acc + val), 6);
   assert.deepStrictEqual(await an().reduce((acc, val) => acc + val, 0), 6);
   assert.deepStrictEqual(await an().reduce((acc, val) => acc - val, 0), -6);
+  assert.deepStrictEqual(await an().reduce(async (acc: number, val) => acc + val), 6);
+  assert.deepStrictEqual(await an().reduce(async (acc, val) => acc + val, 0), 6);
+  assert.deepStrictEqual(await an().reduce(async (acc, val) => acc - val, 0), -6);
   // .forEach
   assert.deepStrictEqual(await an().forEach(() => null), undefined);
+  assert.deepStrictEqual(await an().forEach(async () => null), undefined);
 
   // Non spec for sync iterator
   // .join
@@ -194,14 +205,18 @@ async function main() {
   assert.deepStrictEqual(await an().zip(an()).toArray(), [[1, 1], [2, 2], [3, 3]]);
   // .dropWhile
   assert.deepStrictEqual(await adwc().dropWhile(e => e <= 2).toArray(), [3, 1]);
+  assert.deepStrictEqual(await adwc().dropWhile(async e => e <= 2).toArray(), [3, 1]);
   // .takeWhile
   assert.deepStrictEqual(await atwc().takeWhile(e => e <= 2).toArray(), [1, 2]);
+  assert.deepStrictEqual(await atwc().takeWhile(async e => e <= 2).toArray(), [1, 2]);
   // .fuse
   assert.deepStrictEqual(await afc().fuse().toArray(), [1, 2, 3]);
   // .partition
   assert.deepStrictEqual(await an().partition(c => c <= 2), [[1, 2], [3]]);
+  assert.deepStrictEqual(await an().partition(async c => c <= 2), [[1, 2], [3]]);
   // .findIndex
   assert.strictEqual(await an().findIndex(e => e === 2), 1);
+  assert.strictEqual(await an().findIndex(async e => e === 2), 1);
   // .max
   assert.strictEqual(await an().max(), 3);
   // .min
