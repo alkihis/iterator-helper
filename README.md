@@ -26,7 +26,7 @@ const mapped_cycle = iterator
   .asIndexedPairs(); // For each item, return [iterator_index, item]
 
 for (const [index, element] of mapped_cycle) {
-  console.log(index, element); 
+  console.log(index, element);
   // 0, 2
   // 1, 4
   // 2, 6
@@ -60,7 +60,7 @@ class RangeIterator extends HIterator {
   next() {
     if (this.position < this.stop) {
       const current = this.position;
-      this.position += this.step; 
+      this.position += this.step;
 
       return { value: current, done: false };
     }
@@ -74,6 +74,25 @@ range.next(); // { value: 0, done: false };
 range.next(); // { value: 2, done: false };
 range.next(); // { value: 4, done: false };
 // ...
+```
+
+## Generators helpers
+
+If you have some (a)sync generators, you can wrap them with the appropriate wrapper:
+
+```ts
+import { wrap, awrap } from 'iterator-helper';
+
+function* generateNumbers() {
+  yield 1;
+  yield* [2, 3, 4];
+}
+
+// wrap for sync generators, awrap for async generators.
+generateNumbers = wrap(generateNumbers);
+
+// It works!
+generateNumbers().filter(e => e % 2 === 0).toArray();
 ```
 
 ## API
