@@ -1,6 +1,6 @@
 import './index';
 import * as assert from 'assert';
-import { iter, aiter } from './ItHelper';
+import { iter, aiter, wrap, awrap } from './ItHelper';
 
 function* numbers() {
   yield 1;
@@ -61,15 +61,15 @@ async function* asyncFuseCompatible() {
 }
 
 
-const n = () => iter(numbers());
-const dwc = () => iter(dropWhileCompatible());
-const twc = () => iter(takeWhileCompatible());
-const fc = () => iter(fuseCompatible());
+let n = () => iter(numbers());
+let dwc = () => iter(dropWhileCompatible());
+let twc = () => iter(takeWhileCompatible());
+let fc = () => iter(fuseCompatible());
 
-const an = () => aiter(asyncNumbers());
-const adwc = () => aiter(asyncDropWhileCompatible());
-const atwc = () => aiter(asyncTakeWhileCompatible());
-const afc = () => aiter(asyncFuseCompatible());
+let an = () => aiter(asyncNumbers());
+let adwc = () => aiter(asyncDropWhileCompatible());
+let atwc = () => aiter(asyncTakeWhileCompatible());
+let afc = () => aiter(asyncFuseCompatible());
 
 async function main() {
   let collected: any = n()
@@ -115,7 +115,7 @@ async function main() {
   assert.strictEqual(n().reduce((acc, val) => acc + val, 0), 6);
   assert.strictEqual(n().reduce((acc, val) => acc - val, 0), -6);
   // .forEach
-  assert.deepStrictEqual(n().forEach(console.debug), undefined);
+  assert.deepStrictEqual(n().forEach(() => null), undefined);
 
   // Non spec for sync iterator
   // .join
@@ -146,9 +146,9 @@ async function main() {
   let cycle_generator: any = n().cycle();
   while (--i) {
     const value = cycle_generator.next();
-    assert.equal([1, 2, 3].includes(value.value as number), true);
+    assert.strictEqual([1, 2, 3].includes(value.value as number), true);
   }
-  assert.equal(i, 0);
+  assert.strictEqual(i, 0);
 
   /// END OF sync iterator tests
 
@@ -181,7 +181,7 @@ async function main() {
   assert.deepStrictEqual(await an().reduce((acc, val) => acc + val, 0), 6);
   assert.deepStrictEqual(await an().reduce((acc, val) => acc - val, 0), -6);
   // .forEach
-  assert.deepStrictEqual(await an().forEach(console.debug), undefined);
+  assert.deepStrictEqual(await an().forEach(() => null), undefined);
 
   // Non spec for sync iterator
   // .join
@@ -210,16 +210,33 @@ async function main() {
   // Non testable with assert : .cycle
   i = 1000;
   cycle_generator = an().cycle();
-  (async () => {
+  await (async () => {
     while (--i) {
       const value = await cycle_generator.next();
-      assert.equal([1, 2, 3].includes(value.value as number), true);
+      assert.strictEqual([1, 2, 3].includes(value.value as number), true);
     }
-    assert.equal(i, 0);
+    assert.strictEqual(i, 0);
   })();
 
   console.log('All tests passed successfully.');
 }
 
-main();
+(async () => {
+  console.log('Tests with iter()');
+  await main();
+
+  // Test of wrapped
+
+  n = wrap(numbers);
+  dwc = wrap(dropWhileCompatible);
+  twc = wrap(takeWhileCompatible);
+  fc = wrap(fuseCompatible);
+  an = awrap(asyncNumbers);
+  adwc = awrap(asyncDropWhileCompatible);
+  atwc = awrap(asyncTakeWhileCompatible);
+  afc = awrap(asyncFuseCompatible);
+
+  console.log('Tests with wrap()');
+  await main();
+})();
 

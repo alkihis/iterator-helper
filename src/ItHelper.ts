@@ -1,5 +1,21 @@
 const IteratorSlot = Symbol('IteratorSlot');
 
+type Parameters<T, R> = T extends (... args: infer T) => R ? T : never;
+
+export function wrap<It, T, R>(func: (...args: Parameters<T, R>) => R) {
+  return function (this: any, ...args: any) {
+    // @ts-expect-error
+    return iter(func.call(this, ...args)) as HIterator<It>;
+  };
+}
+
+export function awrap<It, T, R>(func: (...args: Parameters<T, R>) => R) {
+  return function (this: any, ...args: any) {
+    // @ts-expect-error
+    return aiter(func.call(this, ...args)) as HAsyncIterator<It>;
+  };
+}
+
 export function aiter<T>(item: AsyncIterator<T> | AsyncIterator<T>) {
   if (Symbol.asyncIterator in item) {
     // @ts-expect-error
@@ -22,7 +38,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   throw(val?: any) {
     return this[IteratorSlot].throw?.(val) ?? Promise.resolve({ value: undefined, done: true });
   }
-  
+
   return(val?: any) {
     return this[IteratorSlot].return?.(val) ?? Promise.resolve({ value: undefined, done: true });
   }
@@ -244,7 +260,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
       if (Symbol.asyncIterator in mapped) {
         // @ts-ignore
         yield* mapped[Symbol.asyncIterator]();
-      } 
+      }
       else if (Symbol.iterator in mapped) {
         // @ts-ignore
         yield* mapped[Symbol.iterator]();
@@ -299,7 +315,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
 
     while (!value.done) {
       const real_value = value.value;
-      
+
       if (first) {
         first = false;
         final += real_value;
@@ -446,8 +462,8 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
 
     while (!value.done) {
       const real_value = value.value;
-      
-      if (callback(real_value)) 
+
+      if (callback(real_value))
         partition1.push(real_value);
       else
         partition2.push(real_value);
@@ -475,7 +491,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     }
 
     return -1;
-  } 
+  }
 
   /** Only works if it. is a number iterator. Returns the maximum of iterator. */
   async max() {
@@ -522,14 +538,14 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
 
   static async *cycle<T>(this: AsyncIterator<T>) {
     const values = [];
-      
+
     const it = this;
     let value = await it.next();
 
     while (!value.done) {
       const real_value = value.value;
       values.push(real_value);
-      
+
       const next_value = yield real_value;
       value = await it.next(next_value);
     }
@@ -568,7 +584,7 @@ export class HIterator<T> implements Iterator<T> {
   throw(val?: any) {
     return this[IteratorSlot].throw?.(val) ?? { value: undefined, done: true };
   }
-  
+
   return(val?: any) {
     return this[IteratorSlot].return?.(val) ?? { value: undefined, done: true };
   }
@@ -693,7 +709,7 @@ export class HIterator<T> implements Iterator<T> {
     limit = Number(limit);
     if (limit < 0)
       throw new RangeError('Invalid limit.');
-      
+
     return new HIterator(HIterator.take.call(this, limit)) as HIterator<T>;
   }
 
@@ -722,10 +738,10 @@ export class HIterator<T> implements Iterator<T> {
     limit = Number(limit);
     if (limit < 0)
       throw new RangeError('Invalid limit.');
-      
+
     return new HIterator(HIterator.drop.call(this, limit)) as HIterator<T>;
   }
-  
+
   static *drop<T>(this: Iterator<T>, limit: number) {
     const it = this;
     let value = it.next();
@@ -773,8 +789,8 @@ export class HIterator<T> implements Iterator<T> {
     if (typeof mapper !== 'function') {
       throw new TypeError('Mapper must be a function.');
     }
-    
-    return new HIterator(HIterator.flatMap.call(this, mapper as any)) as HIterator<R>; 
+
+    return new HIterator(HIterator.flatMap.call(this, mapper as any)) as HIterator<R>;
   }
 
   static *flatMap<T, R>(this: Iterator<T>, mapper: (value: T) => IterableIterator<R> | R) : Iterator<R> {
@@ -789,7 +805,7 @@ export class HIterator<T> implements Iterator<T> {
       if (Symbol.iterator in mapped) {
         // @ts-ignore
         next_value = yield* mapped[Symbol.iterator]();
-      } 
+      }
       else {
         // @ts-ignore
         next_value = yield mapped;
@@ -875,7 +891,7 @@ export class HIterator<T> implements Iterator<T> {
 
     return final;
   }
-  
+
   /** Iterate through current iterator, then through the given iterators in the correct order. */
   chain<I>(...iterables: IterableIterator<I>[]) : HIterator<T | I> {
     return new HIterator(HIterator.chain.apply(this, iterables)) as HIterator<T | I>;
@@ -883,7 +899,7 @@ export class HIterator<T> implements Iterator<T> {
 
   static *chain<T, I>(this: IterableIterator<T>, ...iterables: IterableIterator<I>[]) {
     yield* this;
-  
+
     for (const it of iterables) {
       yield* it;
     }
@@ -950,7 +966,7 @@ export class HIterator<T> implements Iterator<T> {
 
       finished = true;
       next_value = yield real_value;
-    
+
       value = it.next(next_value);
     }
 
@@ -1019,7 +1035,7 @@ export class HIterator<T> implements Iterator<T> {
     }
 
     return -1;
-  } 
+  }
 
   /** Only works if it. is a number iterator. Returns the maximum of iterator. */
   max() {
@@ -1073,7 +1089,7 @@ export class HIterator<T> implements Iterator<T> {
     while (!value.done) {
       const real_value = value.value;
       values.push(real_value);
-      
+
       const next_value = yield real_value;
       value = it.next(next_value);
     }
