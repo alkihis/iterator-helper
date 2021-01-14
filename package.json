@@ -3,10 +3,11 @@
   "version": "1.0.1",
   "description": "",
   "main": "dist/index.js",
+  "module": "dist/index.mjs",
   "scripts": {
     "test": "node dist/test.js",
     "build": "tsc && npm run build-esm",
-    "build-esm": "tsc --project ./tsconfig-esm.json"
+    "build-esm": "tsc --project ./tsconfig-esm.json && node rename_mjs.js"
   },
   "keywords": [
     "iterator",
