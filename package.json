@@ -4,7 +4,9 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "test": "node dist/test.js"
+    "test": "node dist/test.js",
+    "build": "tsc && npm run build-esm",
+    "build-esm": "tsc --project ./tsconfig-esm.json"
   },
   "keywords": [
     "iterator",
