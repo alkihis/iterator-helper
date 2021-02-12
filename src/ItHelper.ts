@@ -590,8 +590,8 @@ export class HIterator<T> implements Iterator<T> {
   }
 
   /** Map each value of iterator to another value via {callback}. */
-  map<R>(callback: (element: T) => R) : HIterator<T> {
-    return new HIterator(HIterator.map.call(this, callback as any)) as HIterator<T>;
+  map<R>(callback: (element: T) => R) : HIterator<R> {
+    return new HIterator(HIterator.map.call(this, callback as any)) as HIterator<R>;
   }
 
   static *map<T, R>(this: Iterator<T>, callback: (element: T) => R) {
