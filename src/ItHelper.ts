@@ -16,7 +16,7 @@ export function awrap<It, T, R>(func: (...args: Parameters<T, R>) => R) {
   };
 }
 
-export function aiter<T>(item: AsyncIterator<T> | AsyncIterator<T>) {
+export function aiter<T>(item: AsyncIterator<T> | AsyncIterable<T>) {
   if (Symbol.asyncIterator in item) {
     // @ts-expect-error
     return new HAsyncIterator(item[Symbol.asyncIterator]() as AsyncIterator<T>);
