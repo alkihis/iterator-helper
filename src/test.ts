@@ -1,6 +1,5 @@
-import './index';
 import * as assert from 'assert';
-import { iter, aiter, wrap, awrap } from './ItHelper';
+import { iter, aiter, wrap, awrap } from '.';
 
 function* numbers(): Iterator<number> {
   yield 1;
