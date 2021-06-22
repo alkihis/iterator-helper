@@ -1,6 +1,8 @@
 const IteratorSlot = Symbol('IteratorSlot');
 
 type Parameters<T, R> = T extends (... args: infer T) => R ? T : never;
+type IteratorOrIterable<T> = IterableIterator<T> | Iterator<T>;
+type AsyncIteratorOrIterable<T> = AsyncIterableIterator<T> | AsyncIterator<T>;
 
 export function wrap<It, T, R>(func: (...args: Parameters<T, R>) => R) {
   return function (this: any, ...args: any) {
@@ -18,7 +20,6 @@ export function awrap<It, T, R>(func: (...args: Parameters<T, R>) => R) {
 
 export function aiter<T>(item: AsyncIterator<T> | AsyncIterable<T>) {
   if (Symbol.asyncIterator in item) {
-    // @ts-expect-error
     return new HAsyncIterator(item[Symbol.asyncIterator]() as AsyncIterator<T>);
   }
   return new HAsyncIterator(item as AsyncIterator<T>);
@@ -135,7 +136,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
 
   /** Consume iterator and collapse values inside an array. */
   async toArray(max_count = Infinity) {
-    const values = [];
+    const values: T[] = [];
 
     const it = this;
     let value = await it.next();
@@ -347,15 +348,21 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Iterate through current iterator, then through the given iterators in the correct order. */
-  chain<I>(...iterables: AsyncIterableIterator<I>[]) : HAsyncIterator<T | I> {
+  chain<I>(...iterables: AsyncIteratorOrIterable<I>[]) : HAsyncIterator<T | I> {
     return new HAsyncIterator(HAsyncIterator.chain.call(this, ...iterables)) as HAsyncIterator<T | I>;
   }
 
-  static async *chain<T, I>(this: AsyncIterableIterator<T>, ...iterables: AsyncIterableIterator<I>[]) {
+  static async *chain<T, I>(this: AsyncIterableIterator<T>, ...iterables: AsyncIteratorOrIterable<I>[]): AsyncGenerator<T | I, any, any> {
     yield* this;
 
     for (const it of iterables) {
-      yield* it;
+      if ('next' in it) {
+        yield* it as AsyncIterableIterator<I>;
+      } 
+      else {
+        // If its not an iterable, make it one
+        yield* aiter(it);
+      }
     }
   }
 
@@ -455,7 +462,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
 
   /** Partition {true} elements to first array, {false} elements to second one. */
   async partition(callback: (value: T) => boolean | PromiseLike<boolean>) {
-    const partition1 = [], partition2 = [];
+    const partition1: T[] = [], partition2: T[] = [];
 
     const it = this;
     let value = await it.next();
@@ -537,7 +544,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   static async *cycle<T>(this: AsyncIterator<T>) {
-    const values = [];
+    const values: T[] = [];
 
     const it = this;
     let value = await it.next();
@@ -564,7 +571,6 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
 
 export function iter<T>(item: Iterator<T> | Iterable<T>) {
   if (Symbol.iterator in item) {
-    // @ts-expect-error
     return new HIterator(item[Symbol.iterator]() as Iterator<T>);
   }
   return new HIterator(item as Iterator<T>);
@@ -682,7 +688,7 @@ export class HIterator<T> implements Iterator<T> {
 
   /** Consume iterator and collapse values inside an array. */
   toArray(max_count = Infinity) {
-    const values = [];
+    const values: T[] = [];
 
     const it = this;
     let value = it.next();
@@ -893,15 +899,21 @@ export class HIterator<T> implements Iterator<T> {
   }
 
   /** Iterate through current iterator, then through the given iterators in the correct order. */
-  chain<I>(...iterables: IterableIterator<I>[]) : HIterator<T | I> {
+  chain<I>(...iterables: IteratorOrIterable<I>[]) : HIterator<T | I> {
     return new HIterator(HIterator.chain.apply(this, iterables)) as HIterator<T | I>;
   }
 
-  static *chain<T, I>(this: IterableIterator<T>, ...iterables: IterableIterator<I>[]) {
+  static *chain<T, I>(this: IterableIterator<T>, ...iterables: IteratorOrIterable<I>[]): Generator<T | I, any, any> {
     yield* this;
 
     for (const it of iterables) {
-      yield* it;
+      if ('next' in it) {
+        yield* it as IterableIterator<I>;
+      } 
+      else {
+        // If its not an iterable, make it one
+        yield* iter(it);
+      }
     }
   }
 
@@ -999,7 +1011,7 @@ export class HIterator<T> implements Iterator<T> {
 
   /** Partition {true} elements to first array, {false} elements to second one. */
   partition(callback: (value: T) => boolean) {
-    const partition1 = [], partition2 = [];
+    const partition1: T[] = [], partition2: T[] = [];
 
     const it = this;
     let value = it.next();
@@ -1081,7 +1093,7 @@ export class HIterator<T> implements Iterator<T> {
   }
 
   static *cycle<T>(this: Iterator<T>) {
-    const values = [];
+    const values: T[] = [];
 
     const it = this;
     let value = it.next();
