@@ -1,35 +1,43 @@
 import { AsyncIteratorOrIterable, IteratorSlot } from '../types';
 
-export function aiter<T>(item: AsyncIterator<T> | AsyncIterable<T>) {
-  if (Symbol.asyncIterator in item) {
-    // @ts-ignore
-    return new HAsyncIterator(item[Symbol.asyncIterator]() as AsyncIterator<T>);
-  }
-  return new HAsyncIterator(item as AsyncIterator<T>);
+export function aiter<T, TReturn, TNext>(item: AsyncIterator<T, TReturn, TNext>): HAsyncIterator<T, TReturn, TNext>;
+export function aiter<T>(item: AsyncIterable<T>): HAsyncIterator<T>;
+export function aiter<T, TReturn = any, TNext = undefined>(item: AsyncIterator<T, TReturn, TNext> | AsyncIterable<T>) {
+  return HAsyncIterator.from(item);
 }
 
-export class HAsyncIterator<T> implements AsyncIterator<T> {
-  [IteratorSlot]: AsyncIterator<T>;
+export class HAsyncIterator<T, TReturn = any, TNext = undefined> implements AsyncIterator<T, TReturn, TNext> {
+  [IteratorSlot]: AsyncIterator<T, TReturn, TNext>;
 
-  constructor(iterator?: AsyncIterator<T>) {
+  constructor(iterator?: AsyncIterator<T, TReturn, TNext>) {
     this[IteratorSlot] = iterator ?? this;
   }
 
-  next(val?: any) {
-    return this[IteratorSlot].next(val);
+  static from<T, TReturn, TNext>(iterator: AsyncIterator<T, TReturn, TNext>): HAsyncIterator<T, TReturn, TNext>;
+  static from<T>(iterator: AsyncIterable<T>): HAsyncIterator<T>;
+  static from<T, TReturn = any, TNext = undefined>(iterator: AsyncIterator<T, TReturn, TNext> | AsyncIterable<T>): HAsyncIterator<T, TReturn, TNext>;
+  static from<T, TReturn = any, TNext = undefined>(item: AsyncIterator<T, TReturn, TNext> | AsyncIterable<T>) {
+    if (Symbol.asyncIterator in item) {
+      return new HAsyncIterator((item as AsyncIterable<T>)[Symbol.asyncIterator]());
+    }
+    return new HAsyncIterator(item as AsyncIterator<T, TReturn, TNext>);
+  }
+
+  next(val?: TNext) {
+    return this[IteratorSlot].next(val!);
   }
 
   throw(val?: any) {
-    return this[IteratorSlot].throw?.(val) ?? Promise.resolve({ value: undefined, done: true });
+    return this[IteratorSlot].throw?.(val) ?? Promise.resolve({ value: undefined, done: true }) as any as Promise<IteratorResult<T, TReturn>>;
   }
 
-  return(val?: any) {
-    return this[IteratorSlot].return?.(val) ?? Promise.resolve({ value: undefined, done: true });
+  return(val?: TReturn) {
+    return this[IteratorSlot].return?.(val) ?? Promise.resolve({ value: undefined, done: true }) as any as Promise<IteratorResult<T, TReturn>>;
   }
 
   /** Map each value of iterator to another value via {callback}. */
-  map<R>(callback: (value: T) => R | PromiseLike<R>) : HAsyncIterator<R> {
-    return new HAsyncIterator(HAsyncIterator.map.call(this, callback as any)) as HAsyncIterator<R>;
+  map<R>(callback: (value: T) => R | PromiseLike<R>) : HAsyncIterator<R, TReturn, TNext> {
+    return new HAsyncIterator(HAsyncIterator.map.call(this, callback as any)) as HAsyncIterator<R, TReturn, TNext>;
   }
 
   static async *map<T, R>(this: AsyncIterator<T>, callback: (value: T) => R | PromiseLike<R>) {
@@ -46,8 +54,8 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Each value is given through {callback}, return `true` if value is needed into returned iterator. */
-  filter(callback: (value: T) => boolean | PromiseLike<boolean>) : HAsyncIterator<T> {
-    return new HAsyncIterator(HAsyncIterator.filter.call(this, callback as any)) as HAsyncIterator<T>;
+  filter(callback: (value: T) => boolean | PromiseLike<boolean>) : HAsyncIterator<T, TReturn, TNext> {
+    return new HAsyncIterator(HAsyncIterator.filter.call(this, callback as any)) as HAsyncIterator<T, TReturn, TNext>;
   }
 
   static async *filter<T>(this: AsyncIterator<T>, callback: (value: T) => boolean | PromiseLike<boolean>) {
@@ -142,8 +150,8 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Create a new iterator that consume {limit} items, then stops. */
-  take(limit: number) : HAsyncIterator<T> {
-    return new HAsyncIterator(HAsyncIterator.take.call(this, limit)) as HAsyncIterator<T>;
+  take(limit: number) : HAsyncIterator<T, TReturn, TNext> {
+    return new HAsyncIterator(HAsyncIterator.take.call(this, limit)) as HAsyncIterator<T, TReturn, TNext>;
   }
 
   static async *take<T>(this: AsyncIterator<T>, limit: number) {
@@ -171,8 +179,8 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Create a new iterator that skip {limit} items from source iterator, then yield all values. */
-  drop(limit: number) : HAsyncIterator<T> {
-    return new HAsyncIterator(HAsyncIterator.drop.call(this, limit)) as HAsyncIterator<T>;
+  drop(limit: number) : HAsyncIterator<T, TReturn, TNext> {
+    return new HAsyncIterator(HAsyncIterator.drop.call(this, limit)) as HAsyncIterator<T, TReturn, TNext>;
   }
 
   static async *drop<T>(this: AsyncIterator<T>, limit: number) {
@@ -203,8 +211,8 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Get a pair [index, value] for each remaining value of iterable. */
-  asIndexedPairs() : HAsyncIterator<[number, T]> {
-    return new HAsyncIterator(HAsyncIterator.asIndexedPairs.call(this)) as HAsyncIterator<[number, T]>;
+  asIndexedPairs() : HAsyncIterator<[number, T], TReturn, TNext> {
+    return new HAsyncIterator(HAsyncIterator.asIndexedPairs.call(this)) as HAsyncIterator<[number, T], TReturn, TNext>;
   }
 
   static async *asIndexedPairs<T>(this: AsyncIterator<T>) {
@@ -224,8 +232,8 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Like map, but you can return a new iterator that will be flattened. */
-  flatMap<R>(mapper: (value: T) => AsyncIterator<R> | R | PromiseLike<AsyncIterator<R>> | PromiseLike<R>) : HAsyncIterator<R> {
-    return new HAsyncIterator(HAsyncIterator.flatMap.call(this, mapper as any)) as HAsyncIterator<R>;
+  flatMap<R>(mapper: (value: T) => AsyncIterator<R> | R | PromiseLike<AsyncIterator<R>> | PromiseLike<R>) : HAsyncIterator<R, TReturn, TNext> {
+    return new HAsyncIterator(HAsyncIterator.flatMap.call(this, mapper as any)) as HAsyncIterator<R, TReturn, TNext>;
   }
 
   static async *flatMap<T, R>(this: AsyncIterator<T>, mapper: (value: T) => AsyncIterator<R> | R | PromiseLike<AsyncIterator<R>> | PromiseLike<R>) {
@@ -265,7 +273,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
 
     const it = this;
     if (acc === undefined) {
-      acc = (await it.next()).value;
+      acc = (await it.next()).value as any as V;
     }
 
     for await (const value of it) {
@@ -331,8 +339,8 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Iterate through current iterator, then through the given iterators in the correct order. */
-  chain<I>(...iterables: AsyncIteratorOrIterable<I>[]) : HAsyncIterator<T | I> {
-    return new HAsyncIterator(HAsyncIterator.chain.call(this, ...iterables)) as HAsyncIterator<T | I>;
+  chain<I>(...iterables: AsyncIteratorOrIterable<I>[]) : HAsyncIterator<T | I, TReturn, TNext> {
+    return new HAsyncIterator(HAsyncIterator.chain.call(this, ...iterables)) as HAsyncIterator<T | I, TReturn, TNext>;
   }
 
   static async *chain<T, I>(this: AsyncIterableIterator<T>, ...iterables: AsyncIteratorOrIterable<I>[]): AsyncGenerator<T | I, any, any> {
@@ -341,7 +349,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     for (const it of iterables) {
       if ('next' in it) {
         yield* it as AsyncIterableIterator<I>;
-      } 
+      }
       else {
         // If its not an iterable, make it one
         yield* aiter(it);
@@ -350,8 +358,8 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Iterate through multiple iterators together. */
-  zip<O>(...others: AsyncIterableIterator<O>[]) : HAsyncIterator<(T | O)[]> {
-    return new HAsyncIterator(HAsyncIterator.zip.call(this, ...others)) as HAsyncIterator<(T | O)[]>;
+  zip<O>(...others: AsyncIterableIterator<O>[]) : HAsyncIterator<(T | O)[], TReturn, TNext> {
+    return new HAsyncIterator(HAsyncIterator.zip.call(this, ...others)) as HAsyncIterator<(T | O)[], TReturn, TNext>;
   }
 
   static async *zip<T, O>(this: AsyncIterableIterator<T>, ...others: AsyncIterableIterator<O>[]) : AsyncIterator<(T | O)[]> {
@@ -365,8 +373,8 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Continue iterator until {callback} return a falsy value. */
-  takeWhile(callback: (value: T) => boolean | PromiseLike<boolean>) : HAsyncIterator<T> {
-    return new HAsyncIterator(HAsyncIterator.takeWhile.call(this, callback as any)) as HAsyncIterator<T>;
+  takeWhile(callback: (value: T) => boolean | PromiseLike<boolean>) : HAsyncIterator<T, TReturn, TNext> {
+    return new HAsyncIterator(HAsyncIterator.takeWhile.call(this, callback as any)) as HAsyncIterator<T, TReturn, TNext>;
   }
 
   static async *takeWhile<T>(this: AsyncIterator<T>, callback: (value: T) => boolean | PromiseLike<boolean>) {
@@ -391,8 +399,8 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Skip elements until {callback} return a truthy value. */
-  dropWhile(callback: (value: T) => boolean | PromiseLike<boolean>) : HAsyncIterator<T> {
-    return new HAsyncIterator(HAsyncIterator.dropWhile.call(this, callback as any)) as HAsyncIterator<T>;
+  dropWhile(callback: (value: T) => boolean | PromiseLike<boolean>) : HAsyncIterator<T, TReturn, TNext> {
+    return new HAsyncIterator(HAsyncIterator.dropWhile.call(this, callback as any)) as HAsyncIterator<T, TReturn, TNext>;
   }
 
   static async *dropWhile<T>(this: AsyncIterator<T>, callback: (value: T) => boolean | PromiseLike<boolean>) {
@@ -418,8 +426,8 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** Continue iterator until `null` or `undefined` is encountered. */
-  fuse() : HAsyncIterator<T> {
-    return new HAsyncIterator(HAsyncIterator.fuse.call(this)) as HAsyncIterator<T>;
+  fuse() : HAsyncIterator<T, TReturn, TNext> {
+    return new HAsyncIterator(HAsyncIterator.fuse.call(this)) as HAsyncIterator<T, TReturn, TNext>;
   }
 
   static async *fuse<T>(this: AsyncIterator<T>) {
@@ -483,7 +491,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return -1;
   }
 
-  /** Only works if it. is a number iterator. Returns the maximum of iterator. */
+  /** Only works if it is a number iterator. Returns the maximum of iterator. */
   async max() {
     let max = -Infinity;
 
@@ -491,7 +499,10 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     let value = await it.next();
 
     while (!value.done) {
-      const real_value = value.value as any as number;
+      const real_value = Number(value.value ?? 0);
+      if (isNaN(real_value)) {
+        throw new RangeError('Iterator should return numbers only, or null or undefined.');
+      }
 
       if (max < real_value)
         max = real_value;
@@ -502,7 +513,7 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return max;
   }
 
-  /** Only works if it. is a number iterator. Returns the minimum of iterator. */
+  /** Only works if it is a number iterator. Returns the minimum of iterator. */
   async min() {
     let min = Infinity;
 
@@ -510,7 +521,10 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     let value = await it.next();
 
     while (!value.done) {
-      const real_value = value.value as any as number;
+      const real_value = Number(value.value ?? 0);
+      if (isNaN(real_value)) {
+        throw new RangeError('Iterator should return numbers only, or null or undefined.');
+      }
 
       if (min > real_value)
         min = real_value;
@@ -522,8 +536,8 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
   }
 
   /** When iterator ends, go back to the first item then loop. Indefinitively. */
-  cycle() : HAsyncIterator<T> {
-    return new HAsyncIterator(HAsyncIterator.cycle.call(this)) as HAsyncIterator<T>;
+  cycle() : HAsyncIterator<T, TReturn, TNext> {
+    return new HAsyncIterator(HAsyncIterator.cycle.call(this)) as HAsyncIterator<T, TReturn, TNext>;
   }
 
   static async *cycle<T>(this: AsyncIterator<T>) {
@@ -551,4 +565,3 @@ export class HAsyncIterator<T> implements AsyncIterator<T> {
     return this;
   }
 }
-  

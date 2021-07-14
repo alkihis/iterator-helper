@@ -1,6 +1,60 @@
 import * as assert from 'assert';
 import { iter, aiter, wrap, awrap } from '.';
 
+function assertCommunication() {
+  function* testCommunication(): Generator<number, any, string> {
+    // Started with .next parameter as 'Hello', but cannot access it.
+    let testCommu = yield 1;
+    assert.strictEqual(testCommu, 'World');
+    testCommu = yield 2;
+    assert.strictEqual(testCommu, 'Third');
+    testCommu = yield 3;
+    assert.strictEqual(testCommu, 'Quattro');
+    testCommu = yield 4;
+    assert.strictEqual(testCommu, 'Cinq');
+    // it is over, .next() call should return { done: true, value: 'Over' }
+    return 'Over';
+  }
+
+  // All methods should properly give .next() value and yield the good value.
+  const testIt = iter(testCommunication())
+    .map(e => e * 2)
+    .filter(e => !!e);
+
+  assert.deepStrictEqual(testIt.next('Hello'), { value: 2, done: false }); // 'Hello' should not be given ; its normal, it is iterator first call
+  assert.deepStrictEqual(testIt.next('World'), { value: 4, done: false });
+  assert.deepStrictEqual(testIt.next('Third'), { value: 6, done: false });
+  assert.deepStrictEqual(testIt.next('Quattro'), { value: 8, done: false });
+  assert.deepStrictEqual(testIt.next('Cinq'), { value: 'Over', done: true });
+}
+
+async function assertAsyncCommunication() {
+  async function* testCommunication(): AsyncGenerator<number, any, string> {
+    // Started with .next parameter as 'Hello', but cannot access it.
+    let testCommu = yield Promise.resolve(1);
+    assert.strictEqual(testCommu, 'World');
+    testCommu = yield Promise.resolve(2);
+    assert.strictEqual(testCommu, 'Third');
+    testCommu = yield Promise.resolve(3);
+    assert.strictEqual(testCommu, 'Quattro');
+    testCommu = yield Promise.resolve(4);
+    assert.strictEqual(testCommu, 'Cinq');
+    // it is over, .next() call should return { done: true, value: 'Over' }
+    return 'Over';
+  }
+
+  // All methods should properly give .next() value and yield the good value.
+  const testIt = aiter(testCommunication())
+    .map(e => e * 2)
+    .filter(e => !!e);
+
+  assert.deepStrictEqual(await testIt.next('Hello'), { value: 2, done: false }); // 'Hello' should not be given ; its normal, it is iterator first call
+  assert.deepStrictEqual(await testIt.next('World'), { value: 4, done: false });
+  assert.deepStrictEqual(await testIt.next('Third'), { value: 6, done: false });
+  assert.deepStrictEqual(await testIt.next('Quattro'), { value: 8, done: false });
+  assert.deepStrictEqual(await testIt.next('Cinq'), { value: 'Over', done: true });
+}
+
 function* numbers(): Iterator<number> {
   yield 1;
   yield 2;
@@ -149,6 +203,8 @@ async function main() {
   }
   assert.strictEqual(i, 0);
 
+  assertCommunication();
+
   /// END OF sync iterator tests
 
   // ASYNC ITERATOR TESTS
@@ -220,6 +276,8 @@ async function main() {
   assert.strictEqual(await an().max(), 3);
   // .min
   assert.strictEqual(await an().min(), 1);
+
+  assertAsyncCommunication();
 
   // Non testable with assert : .cycle
   i = 1000;

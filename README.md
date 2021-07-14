@@ -76,25 +76,6 @@ range.next(); // { value: 4, done: false };
 // ...
 ```
 
-## Generators helpers
-
-If you have some (a)sync generators, you can wrap them with the appropriate wrapper:
-
-```ts
-import { wrap, awrap } from 'iterator-helper';
-
-function* generateNumbers() {
-  yield 1;
-  yield* [2, 3, 4];
-}
-
-// wrap for sync generators, awrap for async generators.
-generateNumbers = wrap(generateNumbers);
-
-// It works!
-generateNumbers().filter(e => e % 2 === 0).toArray();
-```
-
 ## API
 
 As the proposal purpose, there are a few methods for each prototype. They're presented here with TypeScript types.
@@ -146,9 +127,9 @@ interface HIterator<T, TReturn = any, TNext = undefined> {
   partition(callback: (value: T) => boolean) : [T[], T[]];
   /** Find the iterator index of the first element that returns a truthy value, -1 otherwise. */
   findIndex(callback: (value: T) => boolean) : number;
-  /** Only works if it. is a number iterator. Returns the maximum of iterator. */
+  /** Only works if it is a number iterator. Returns the maximum of iterator. */
   max() : number;
-  /** Only works if it. is a number iterator. Returns the minimum of iterator. */
+  /** Only works if it is a number iterator. Returns the minimum of iterator. */
   min() : number;
   /** When iterator ends, go back to the first item then loop. Indefinitively. */
   cycle() : HIterator<T>;

@@ -1,35 +1,43 @@
 import { IteratorOrIterable, IteratorSlot } from '../types';
 
-export function iter<T>(item: Iterator<T> | Iterable<T>) {
-  if (Symbol.iterator in item) {
-    // @ts-ignore
-    return new HIterator(item[Symbol.iterator]() as Iterator<T>);
-  }
-  return new HIterator(item as Iterator<T>);
+export function iter<T, TReturn, TNext>(item: Iterator<T, TReturn, TNext>): HIterator<T, TReturn, TNext>;
+export function iter<T>(item: Iterable<T>): HIterator<T>;
+export function iter<T, TReturn = any, TNext = undefined>(item: Iterator<T, TReturn, TNext> | Iterable<T>) {
+  return HIterator.from(item);
 }
 
-export class HIterator<T> implements Iterator<T> {
-  [IteratorSlot]: Iterator<T>;
+export class HIterator<T, TReturn = any, TNext = undefined> implements Iterator<T, TReturn, TNext> {
+  [IteratorSlot]: Iterator<T, TReturn, TNext>;
 
-  constructor(iterator?: Iterator<T>) {
+  constructor(iterator?: Iterator<T, TReturn, TNext>) {
     this[IteratorSlot] = iterator ?? this;
   }
 
-  next(val?: any) {
-    return this[IteratorSlot].next(val);
+  static from<T, TReturn, TNext>(iterator: Iterator<T, TReturn, TNext>): HIterator<T, TReturn, TNext>;
+  static from<T>(iterator: Iterable<T>): HIterator<T>;
+  static from<T, TReturn = any, TNext = undefined>(iterator: Iterator<T, TReturn, TNext> | Iterable<T>): HIterator<T, TReturn, TNext>;
+  static from<T, TReturn = any, TNext = undefined>(iterator: Iterator<T, TReturn, TNext> | Iterable<T>) {
+    if (Symbol.iterator in iterator) {
+      return new HIterator((iterator as Iterable<T>)[Symbol.iterator]());
+    }
+    return new HIterator(iterator as Iterator<T, TReturn, TNext>);
+  }
+
+  next(val?: TNext) {
+    return this[IteratorSlot].next(val!);
   }
 
   throw(val?: any) {
-    return this[IteratorSlot].throw?.(val) ?? { value: undefined, done: true };
+    return this[IteratorSlot].throw?.(val) ?? { value: undefined, done: true } as any as IteratorResult<T, TReturn>;
   }
 
-  return(val?: any) {
-    return this[IteratorSlot].return?.(val) ?? { value: undefined, done: true };
+  return(val?: TReturn) {
+    return this[IteratorSlot].return?.(val) ?? { value: undefined, done: true } as any as IteratorResult<T, TReturn>;
   }
 
   /** Map each value of iterator to another value via {callback}. */
-  map<R>(callback: (element: T) => R) : HIterator<R> {
-    return new HIterator(HIterator.map.call(this, callback as any)) as HIterator<R>;
+  map<R>(callback: (element: T) => R) : HIterator<R, TReturn, TNext> {
+    return new HIterator(HIterator.map.call(this, callback as any)) as HIterator<R, TReturn, TNext>;
   }
 
   static *map<T, R>(this: Iterator<T>, callback: (element: T) => R) {
@@ -46,8 +54,8 @@ export class HIterator<T> implements Iterator<T> {
   }
 
   /** Each value is given through {callback}, return `true` if value is needed into returned iterator. */
-  filter(callback: (value: T) => boolean) : HIterator<T> {
-    return new HIterator(HIterator.filter.call(this, callback as any)) as HIterator<T>;
+  filter(callback: (value: T) => boolean) : HIterator<T, TReturn, TNext> {
+    return new HIterator(HIterator.filter.call(this, callback as any)) as HIterator<T, TReturn, TNext>;
   }
 
   static *filter<T>(this: Iterator<T>, callback: (value: T) => boolean) {
@@ -143,12 +151,12 @@ export class HIterator<T> implements Iterator<T> {
   }
 
   /** Create a new iterator that consume {limit} items, then stops. */
-  take(limit: number) : HIterator<T> {
+  take(limit: number) : HIterator<T, TReturn, TNext> {
     limit = Number(limit);
     if (limit < 0)
       throw new RangeError('Invalid limit.');
 
-    return new HIterator(HIterator.take.call(this, limit)) as HIterator<T>;
+    return new HIterator(HIterator.take.call(this, limit)) as HIterator<T, TReturn, TNext>;
   }
 
   static *take<T>(this: Iterator<T>, limit: number) {
@@ -172,12 +180,12 @@ export class HIterator<T> implements Iterator<T> {
   }
 
   /** Create a new iterator that skip {limit} items from source iterator, then yield all values. */
-  drop(limit: number) : HIterator<T> {
+  drop(limit: number) : HIterator<T, TReturn, TNext> {
     limit = Number(limit);
     if (limit < 0)
       throw new RangeError('Invalid limit.');
 
-    return new HIterator(HIterator.drop.call(this, limit)) as HIterator<T>;
+    return new HIterator(HIterator.drop.call(this, limit)) as HIterator<T, TReturn, TNext>;
   }
 
   static *drop<T>(this: Iterator<T>, limit: number) {
@@ -203,8 +211,8 @@ export class HIterator<T> implements Iterator<T> {
   }
 
   /** Get a pair [index, value] for each remaining value of iterable. */
-  asIndexedPairs() : HIterator<[number, T]> {
-    return new HIterator(HIterator.asIndexedPairs.call(this)) as HIterator<[number, T]>;
+  asIndexedPairs() : HIterator<[number, T], TReturn, TNext> {
+    return new HIterator(HIterator.asIndexedPairs.call(this)) as HIterator<[number, T], TReturn, TNext>;
   }
 
   static *asIndexedPairs<T>(this: Iterator<T>) {
@@ -223,12 +231,12 @@ export class HIterator<T> implements Iterator<T> {
   }
 
   /** Like map, but you can return a new iterator that will be flattened. */
-  flatMap<R>(mapper: (value: T) => IterableIterator<R> | R) : HIterator<R> {
+  flatMap<R>(mapper: (value: T) => IterableIterator<R> | R) : HIterator<R, TReturn, TNext> {
     if (typeof mapper !== 'function') {
       throw new TypeError('Mapper must be a function.');
     }
 
-    return new HIterator(HIterator.flatMap.call(this, mapper as any)) as HIterator<R>;
+    return new HIterator(HIterator.flatMap.call(this, mapper as any)) as HIterator<R, TReturn, TNext>;
   }
 
   static *flatMap<T, R>(this: Iterator<T>, mapper: (value: T) => IterableIterator<R> | R) : Iterator<R> {
@@ -261,7 +269,7 @@ export class HIterator<T> implements Iterator<T> {
 
     const it = this;
     if (acc === undefined) {
-      acc = it.next().value;
+      acc = it.next().value as any as V;
     }
 
     let value = it.next();
@@ -331,8 +339,8 @@ export class HIterator<T> implements Iterator<T> {
   }
 
   /** Iterate through current iterator, then through the given iterators in the correct order. */
-  chain<I>(...iterables: IteratorOrIterable<I>[]) : HIterator<T | I> {
-    return new HIterator(HIterator.chain.apply(this, iterables)) as HIterator<T | I>;
+  chain<I>(...iterables: IteratorOrIterable<I>[]) : HIterator<T | I, TReturn, TNext> {
+    return new HIterator(HIterator.chain.apply(this, iterables)) as HIterator<T | I, TReturn, TNext>;
   }
 
   static *chain<T, I>(this: IterableIterator<T>, ...iterables: IteratorOrIterable<I>[]): Generator<T | I, any, any> {
@@ -341,7 +349,7 @@ export class HIterator<T> implements Iterator<T> {
     for (const it of iterables) {
       if ('next' in it) {
         yield* it as IterableIterator<I>;
-      } 
+      }
       else {
         // If its not an iterable, make it one
         yield* iter(it);
@@ -350,8 +358,8 @@ export class HIterator<T> implements Iterator<T> {
   }
 
   /** Iterate through multiple iterators together. */
-  zip<O>(...others: IterableIterator<O>[]) : HIterator<(T | O)[]> {
-    return new HIterator(HIterator.zip.apply(this, others)) as HIterator<(T | O)[]>;
+  zip<O>(...others: IterableIterator<O>[]) : HIterator<(T | O)[], TReturn, TNext> {
+    return new HIterator(HIterator.zip.apply(this, others)) as HIterator<(T | O)[], TReturn, TNext>;
   }
 
   static *zip<T, O>(this: Iterator<T>, ...others: IterableIterator<O>[]) : Iterator<(T | O)[]> {
@@ -366,8 +374,8 @@ export class HIterator<T> implements Iterator<T> {
   }
 
   /** Continue iterator until {callback} return a falsy value. */
-  takeWhile(callback: (value: T) => boolean) : HIterator<T> {
-    return new HIterator(HIterator.takeWhile.call(this, callback as any)) as HIterator<T>;
+  takeWhile(callback: (value: T) => boolean) : HIterator<T, TReturn, TNext> {
+    return new HIterator(HIterator.takeWhile.call(this, callback as any)) as HIterator<T, TReturn, TNext>;
   }
 
   static *takeWhile<T>(this: Iterator<T>, callback: (value: T) => boolean) {
@@ -390,8 +398,8 @@ export class HIterator<T> implements Iterator<T> {
   }
 
   /** Skip elements until {callback} return a truthy value. */
-  dropWhile(callback: (value: T) => boolean) : HIterator<T> {
-    return new HIterator(HIterator.dropWhile.call(this, callback as any)) as HIterator<T>;
+  dropWhile(callback: (value: T) => boolean) : HIterator<T, TReturn, TNext> {
+    return new HIterator(HIterator.dropWhile.call(this, callback as any)) as HIterator<T, TReturn, TNext>;
   }
 
   static *dropWhile<T>(this: Iterator<T>, callback: (value: T) => boolean) {
@@ -418,8 +426,8 @@ export class HIterator<T> implements Iterator<T> {
   }
 
   /** Continue iterator until `null` or `undefined` is encountered. */
-  fuse() : HIterator<T> {
-    return new HIterator(HIterator.fuse.call(this)) as HIterator<T>;
+  fuse() : HIterator<T, TReturn, TNext> {
+    return new HIterator(HIterator.fuse.call(this)) as HIterator<T, TReturn, TNext>;
   }
 
   static *fuse<T>(this: Iterator<T>) {
@@ -481,7 +489,7 @@ export class HIterator<T> implements Iterator<T> {
     return -1;
   }
 
-  /** Only works if it. is a number iterator. Returns the maximum of iterator. */
+  /** Only works if it is a number iterator. Returns the maximum of iterator. */
   max() {
     let max = -Infinity;
 
@@ -489,7 +497,10 @@ export class HIterator<T> implements Iterator<T> {
     let value = it.next();
 
     while (!value.done) {
-      const real_value = value.value as any as number;
+      const real_value = Number(value.value ?? 0);
+      if (isNaN(real_value)) {
+        throw new RangeError('Iterator should return numbers only, or null or undefined.');
+      }
 
       if (max < real_value)
         max = real_value;
@@ -500,7 +511,7 @@ export class HIterator<T> implements Iterator<T> {
     return max;
   }
 
-  /** Only works if it. is a number iterator. Returns the minimum of iterator. */
+  /** Only works if it is a number iterator. Returns the minimum of iterator. */
   min() {
     let min = Infinity;
 
@@ -508,7 +519,10 @@ export class HIterator<T> implements Iterator<T> {
     let value = it.next();
 
     while (!value.done) {
-      const real_value = value.value as any as number;
+      const real_value = Number(value.value ?? 0);
+      if (isNaN(real_value)) {
+        throw new RangeError('Iterator should return numbers only, or null or undefined.');
+      }
 
       if (min > real_value)
         min = real_value;
@@ -520,8 +534,8 @@ export class HIterator<T> implements Iterator<T> {
   }
 
   /** When iterator ends, go back to the first item then loop. Indefinitively. */
-  cycle() : HIterator<T> {
-    return new HIterator(HIterator.cycle.call(this)) as HIterator<T>;
+  cycle() : HIterator<T, TReturn, TNext> {
+    return new HIterator(HIterator.cycle.call(this)) as HIterator<T, TReturn, TNext>;
   }
 
   static *cycle<T>(this: Iterator<T>) {

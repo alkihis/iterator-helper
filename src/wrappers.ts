@@ -1,5 +1,5 @@
-import { iter } from './iterator';
-import { aiter } from './async-iterator';
+import { HIterator, iter } from './iterator';
+import { aiter, HAsyncIterator } from './async-iterator';
 import { Parameters } from './types';
 
 export function wrap<It, T, R>(func: (...args: Parameters<T, R>) => R) {
