@@ -1,12 +1,5 @@
 import { AsyncIteratorOrIterable, IteratorSlot } from '../types';
 
-export function aiter<T, TReturn, TNext>(item: AsyncIterator<T, TReturn, TNext>): HAsyncIterator<T, TReturn, TNext>;
-export function aiter<T>(item: AsyncIterable<T>): HAsyncIterator<T>;
-export function aiter<T, TReturn = any, TNext = undefined>(iterator: AsyncIterator<T, TReturn, TNext> | AsyncIterable<T>): HAsyncIterator<T, TReturn, TNext>;
-export function aiter<T, TReturn = any, TNext = undefined>(item: AsyncIterator<T, TReturn, TNext> | AsyncIterable<T>) {
-  return HAsyncIterator.from(item);
-}
-
 export class HAsyncIterator<T, TReturn = any, TNext = undefined> implements AsyncIterator<T, TReturn, TNext> {
   [IteratorSlot]: AsyncIterator<T, TReturn, TNext>;
 
@@ -353,18 +346,25 @@ export class HAsyncIterator<T, TReturn = any, TNext = undefined> implements Asyn
       }
       else {
         // If its not an iterable, make it one
-        yield* aiter(it);
+        yield* HAsyncIterator.from(it);
       }
     }
   }
 
   /** Iterate through multiple iterators together. */
-  zip<O>(...others: AsyncIterableIterator<O>[]) : HAsyncIterator<(T | O)[], TReturn, TNext> {
+  zip<O>(other: AsyncIteratorOrIterable<O>) : HAsyncIterator<[T, O][], TReturn, TNext>;
+  zip<O>(...others: AsyncIteratorOrIterable<O>[]) : HAsyncIterator<(T | O)[], TReturn, TNext>;
+  zip<O>(...others: AsyncIteratorOrIterable<O>[]) : HAsyncIterator<(T | O)[], TReturn, TNext> {
     return new HAsyncIterator(HAsyncIterator.zip.call(this, ...others)) as HAsyncIterator<(T | O)[], TReturn, TNext>;
   }
 
-  static async *zip<T, O>(this: AsyncIterableIterator<T>, ...others: AsyncIterableIterator<O>[]) : AsyncIterator<(T | O)[]> {
-    const it_array = [this, ...others].map((e: any) => Symbol.asyncIterator in e ? e[Symbol.asyncIterator]() : e as AsyncIterator<T | O>);
+  static async *zip<T, O>(this: AsyncIteratorOrIterable<T>, ...others: AsyncIteratorOrIterable<O>[]) : AsyncIterator<(T | O)[]> {
+    const it_array = [this, ...others]
+      .map((e: AsyncIteratorOrIterable<T | O>) =>
+        Symbol.asyncIterator in e
+          ? (e as AsyncIterable<T | O>)[Symbol.asyncIterator]()
+          : e as AsyncIterator<T | O>
+      );
     let values = await Promise.all(it_array.map(e => e.next()));
 
     while (values.every(e => !e.done)) {
@@ -514,23 +514,23 @@ export class HAsyncIterator<T, TReturn = any, TNext = undefined> implements Asyn
     return map;
   }
 
-  /** 
-   * Iterate over items present in both current collection and {otherItems} iterable. 
-   * **Warning**: This is a O(n*m) operation and this will consume {otherItems} iterator/iterable! 
-   */  
+  /**
+   * Iterate over items present in both current collection and {otherItems} iterable.
+   * **Warning**: This is a O(n*m) operation and this will consume {otherItems} iterator/iterable!
+   */
   intersection<O>(
-    otherItems: AsyncIteratorOrIterable<O>, 
+    otherItems: AsyncIteratorOrIterable<O>,
     isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is,
   ) : HAsyncIterator<T, TReturn, TNext> {
     return new HAsyncIterator(HAsyncIterator.intersection.call(this, otherItems, isSameItemCallback as any)) as HAsyncIterator<T, TReturn, TNext>;
   }
 
   static async *intersection<T, O>(
-    this: AsyncIterator<T>, 
-    otherItems: AsyncIteratorOrIterable<O>, 
+    this: AsyncIterator<T>,
+    otherItems: AsyncIteratorOrIterable<O>,
     isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is,
   ) {
-    const otherItemsCollection = await aiter(otherItems).toArray();
+    const otherItemsCollection = await HAsyncIterator.from(otherItems).toArray();
     const it = this;
     let value = await it.next();
     let nextValue: unknown;
@@ -538,36 +538,36 @@ export class HAsyncIterator<T, TReturn = any, TNext = undefined> implements Asyn
     while (!value.done) {
       const realValue = value.value;
 
-      // Yield real_value if any {item} match {real_value} 
+      // Yield real_value if any {item} match {real_value}
       if (await asyncSome(otherItemsCollection, item => isSameItemCallback(realValue, item))) {
         nextValue = yield realValue;
       }
-      
+
       value = await it.next(nextValue as any);
     }
 
     return value.value;
   }
 
-  /** 
-   * Iterate over items present only in current collection, not in {otherItems} iterable. 
-   * **Warning**: This is a O(n*m) operation and this will consume {otherItems} iterator/iterable! 
+  /**
+   * Iterate over items present only in current collection, not in {otherItems} iterable.
+   * **Warning**: This is a O(n*m) operation and this will consume {otherItems} iterator/iterable!
    */
   difference<O>(
-    otherItems: AsyncIteratorOrIterable<O>, 
+    otherItems: AsyncIteratorOrIterable<O>,
     isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is,
   ) : HAsyncIterator<T, TReturn, TNext> {
     return new HAsyncIterator(HAsyncIterator.difference.call(this, otherItems, isSameItemCallback as any)) as HAsyncIterator<T, TReturn, TNext>;
   }
 
   static async *difference<T, O>(
-    this: AsyncIterator<T>, 
-    otherItems: AsyncIteratorOrIterable<O>, 
+    this: AsyncIterator<T>,
+    otherItems: AsyncIteratorOrIterable<O>,
     isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is,
   ) {
     const it = this;
     let value = await it.next();
-    const otherItemsCollection = await aiter(otherItems).toArray();
+    const otherItemsCollection = await HAsyncIterator.from(otherItems).toArray();
     let nextValue: unknown;
 
     while (!value.done) {
@@ -578,32 +578,32 @@ export class HAsyncIterator<T, TReturn = any, TNext = undefined> implements Asyn
       if (!currentItemPresentInOtherItems) {
         nextValue = yield realValue;
       }
-      
+
       value = await it.next(nextValue as any);
     }
 
     return value.value;
   }
 
-  /** 
-   * Iterate over items present only in current collection or only in {otherItems} iterable, but not in both. 
-   * **Warning**: This is a O(n*m) operation and this will consume {otherItems} iterator/iterable! 
+  /**
+   * Iterate over items present only in current collection or only in {otherItems} iterable, but not in both.
+   * **Warning**: This is a O(n*m) operation and this will consume {otherItems} iterator/iterable!
    */
   symmetricDifference<O>(
-    otherItems: AsyncIteratorOrIterable<O>, 
+    otherItems: AsyncIteratorOrIterable<O>,
     isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is,
   ) : HAsyncIterator<T | O, TReturn, TNext> {
     return new HAsyncIterator(HAsyncIterator.symmetricDifference.call(this, otherItems, isSameItemCallback as any)) as HAsyncIterator<T | O, TReturn, TNext>;
   }
 
   static async *symmetricDifference<T, O>(
-    this: AsyncIterator<T>, 
-    otherItems: AsyncIteratorOrIterable<O>, 
+    this: AsyncIterator<T>,
+    otherItems: AsyncIteratorOrIterable<O>,
     isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is,
   ) {
     const it = this;
     let value = await it.next();
-    const otherItemsCollection = await aiter(otherItems).toArray();
+    const otherItemsCollection = await HAsyncIterator.from(otherItems).toArray();
     const presentInBothCollections = new Set<O>();
     let nextValue: unknown;
 
@@ -620,7 +620,7 @@ export class HAsyncIterator<T, TReturn = any, TNext = undefined> implements Asyn
         // No match in other collection, can emit it
         nextValue = yield realValue;
       }
-      
+
       value = await it.next(nextValue as any);
     }
 

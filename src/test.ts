@@ -244,6 +244,16 @@ async function main() {
   }
   assert.strictEqual(i, 0);
 
+  // Static methods
+  // .range
+  assert.deepStrictEqual(iter.range(5).toArray(), [0, 1, 2, 3, 4]);
+  assert.deepStrictEqual(iter.range(1, 5).toArray(), [1, 2, 3, 4]);
+  assert.deepStrictEqual(iter.range(1, 11, 2).toArray(), [1, 3, 5, 7, 9]);
+  // .repeat
+  assert.deepStrictEqual(iter.repeat(4).take(4).toArray(), [4, 4, 4, 4]);
+  assert.deepStrictEqual(iter.repeat(4, 4).toArray(), [4, 4, 4, 4]);
+  assert.deepStrictEqual(iter.repeat(4, 6).toArray(), [4, 4, 4, 4, 4, 4]);
+
   assertCommunication();
   assertSetMethods();
 
