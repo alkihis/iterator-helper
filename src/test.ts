@@ -1,5 +1,10 @@
 import * as assert from 'assert';
-import { iter, aiter, wrap, awrap } from '.';
+import { iter, aiter, wrap, awrap, HIterator } from '.';
+import { IteratorOrIterable } from './types';
+
+function toait<T>(iterator: IteratorOrIterable<T>) {
+  return HIterator.toAsyncIterator(iterator);
+}
 
 function assertCommunication() {
   function* testCommunication(): Generator<number, any, string> {
@@ -53,6 +58,38 @@ async function assertAsyncCommunication() {
   assert.deepStrictEqual(await testIt.next('Third'), { value: 6, done: false });
   assert.deepStrictEqual(await testIt.next('Quattro'), { value: 8, done: false });
   assert.deepStrictEqual(await testIt.next('Cinq'), { value: 'Over', done: true });
+}
+
+function assertSetMethods() {
+  const items1 = [1, 2, 3, 4], items2 = [3, 4, 5, 6, 7], items3 = [6, 7, 8, 9];
+
+  assert.deepStrictEqual(iter(items1).intersection(items2).toArray(), [3, 4]);
+  assert.deepStrictEqual(iter(items1).intersection(items3).toArray(), []);
+  assert.deepStrictEqual(iter(items2).intersection(items3).toArray(), [6, 7]);
+
+  assert.deepStrictEqual(iter(items1).difference(items2).toArray(), [1, 2]);
+  assert.deepStrictEqual(iter(items1).difference(items3).toArray(), [1, 2, 3, 4]);
+  assert.deepStrictEqual(iter(items2).difference(items3).toArray(), [3, 4, 5]);
+
+  assert.deepStrictEqual(iter(items1).symmetricDifference(items2).toArray(), [1, 2, 5, 6, 7]);
+  assert.deepStrictEqual(iter(items1).symmetricDifference(items3).toArray(), [1, 2, 3, 4, 6, 7, 8, 9]);
+  assert.deepStrictEqual(iter(items2).symmetricDifference(items3).toArray(), [3, 4, 5, 8, 9]);
+}
+
+async function assertAsyncSetMethods() {
+  const items1 = [1, 2, 3, 4], items2 = [3, 4, 5, 6, 7], items3 = [6, 7, 8, 9];
+
+  assert.deepStrictEqual(await aiter(toait(items1)).intersection(toait(items2)).toArray(), [3, 4]);
+  assert.deepStrictEqual(await aiter(toait(items1)).intersection(toait(items3)).toArray(), []);
+  assert.deepStrictEqual(await aiter(toait(items2)).intersection(toait(items3)).toArray(), [6, 7]);
+
+  assert.deepStrictEqual(await aiter(toait(items1)).difference(toait(items2)).toArray(), [1, 2]);
+  assert.deepStrictEqual(await aiter(toait(items1)).difference(toait(items3)).toArray(), [1, 2, 3, 4]);
+  assert.deepStrictEqual(await aiter(toait(items2)).difference(toait(items3)).toArray(), [3, 4, 5]);
+
+  assert.deepStrictEqual(await aiter(toait(items1)).symmetricDifference(toait(items2)).toArray(), [1, 2, 5, 6, 7]);
+  assert.deepStrictEqual(await aiter(toait(items1)).symmetricDifference(toait(items3)).toArray(), [1, 2, 3, 4, 6, 7, 8, 9]);
+  assert.deepStrictEqual(await aiter(toait(items2)).symmetricDifference(toait(items3)).toArray(), [3, 4, 5, 8, 9]);
 }
 
 function* numbers(): Iterator<number> {
@@ -193,6 +230,10 @@ async function main() {
   assert.strictEqual(n().max(), 3);
   // .min
   assert.strictEqual(n().min(), 1);
+  // .groupBy
+  assert.deepStrictEqual(n().groupBy(v => v % 2 ? 'odd' : 'even'), { odd: [1, 3], even: [2] });
+  // .toIndexedItems
+  assert.deepStrictEqual([...n().toIndexedItems(v => v).entries()], [[1, 1], [2, 2], [3, 3]]);
 
   // Non testable with assert : .cycle
   let i = 1000;
@@ -204,6 +245,7 @@ async function main() {
   assert.strictEqual(i, 0);
 
   assertCommunication();
+  assertSetMethods();
 
   /// END OF sync iterator tests
 
@@ -276,8 +318,13 @@ async function main() {
   assert.strictEqual(await an().max(), 3);
   // .min
   assert.strictEqual(await an().min(), 1);
+  // .groupBy
+  assert.deepStrictEqual(await an().groupBy(v => v % 2 ? 'odd' : 'even'), { odd: [1, 3], even: [2] });
+  // .toIndexedItems
+  assert.deepStrictEqual([...(await an().toIndexedItems(v => v)).entries()], [[1, 1], [2, 2], [3, 3]]);
 
-  assertAsyncCommunication();
+  await assertAsyncCommunication();
+  await assertAsyncSetMethods();
 
   // Non testable with assert : .cycle
   i = 1000;
