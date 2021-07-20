@@ -609,10 +609,10 @@ export class HIterator<T, TReturn = any, TNext = undefined> implements Iterator<
       const realValue = value.value;
 
       // Try to find same item as current in {other_items_collection}
-      const other_item = otherItemsCollection.find(item => isSameItemCallback(realValue, item));
+      const otherItemIndex = otherItemsCollection.findIndex(item => isSameItemCallback(realValue, item));
 
-      if (other_item) {
-        presentInBothCollections.add(other_item);
+      if (otherItemIndex !== -1) {
+        presentInBothCollections.add(otherItemsCollection[otherItemIndex]);
       }
       else {
         // No match in other collection, can emit it
