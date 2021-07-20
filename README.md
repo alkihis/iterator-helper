@@ -246,3 +246,23 @@ interface IIterFunction {
   repeat<I>(item: I, times: number): HIterator<I>;
 }
 ```
+
+### Example
+
+```ts
+for (const i of iter.range(10)) {
+  // i will goes from 0 to 9 (included)
+}
+
+for (const _ of iter.repeat(null, 10)) {
+  // This loop content will be executed 10 times
+}
+
+iter.repeat({ id: 1, name: 'Sialae' }) // Create an infinite iterator that yield { id: 1, name: 'Sialae' }
+  .asIndexedPairs() // Yield [index, element]
+  .map(([index, item]) => ({ ...item, id: index + 1 })) // For [index, element], returns { ...element, id: index + 1 }
+  .filter(item => item.id % 2 !== 0) // Yield only elements with element.id % 2 !== 0
+  .take(3) // Yield 3 items maximum then close the iterator
+  .toArray(); // Store the remaining iterator items into an array (3 elements)
+// Result: [{ name: 'Sialae', id: 0 }, { name: 'Sialae', id: 2 }, { name: 'Sialae', id: 4 }]
+```
