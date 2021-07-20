@@ -133,6 +133,16 @@ interface HIterator<T, TReturn = any, TNext = undefined> {
   min() : number;
   /** When iterator ends, go back to the first item then loop. Indefinitively. */
   cycle() : HIterator<T>;
+  /** Group by objects by key according to returned key for each object. */
+  groupBy<K extends string | number | symbol>(callback: (value: T) => K) : { [Key in K]: T[] };
+  /** Index this iterator objects in a {Map} with key obtained through {keyGetter}. */
+  toIndexedItems<K>(keyGetter: (value: T) => K) : Map<K, T>;
+  /** Iterate over items present in both current collection and {otherItems} iterable. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */  
+  intersection<O>(otherItems: IteratorOrIterable<O>, isSameItemCallback: (value: T, other: O) => boolean = Object.is) : HIterator<T>;
+  /** Iterate over items present only in current collection, not in {otherItems} iterable. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */  
+  difference<O>(otherItems: IteratorOrIterable<O>, isSameItemCallback: (value: T, other: O) => boolean = Object.is) : HIterator<T>;
+  /** Iterate over items present only in current collection or only in {otherItems} iterable, but not in both. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */  
+  symmetricDifference<O>(otherItems: IteratorOrIterable<O>, isSameItemCallback: (value: T, other: O) => boolean = Object.is) : HIterator<T>;
 }
 
 interface HAsyncIterator<T, TReturn = any, TNext = undefined> {
@@ -187,7 +197,24 @@ interface HAsyncIterator<T, TReturn = any, TNext = undefined> {
   min() : Promise<number>;
   /** When iterator ends, go back to the first item then loop. Indefinitively. */
   cycle() : HAsyncIterator<T>;
+  /** Group by objects by key according to returned key for each object. */
+  groupBy<K extends string | number | symbol>(callback: (value: T) => K | PromiseLike<K>) : Promise<{ [Key in K]: T[] }>;
+  /** Index this iterator objects in a {Map} with key obtained through {keyGetter}. */
+  toIndexedItems<K>(keyGetter: (value: T) => K | PromiseLike<K>) : Promise<Map<K, T>>;
+  /** Iterate over items present in both current collection and {otherItems} iterable. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */  
+  intersection<O>(
+    otherItems: AsyncIteratorOrIterable<O>, 
+    isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is
+  ) : HAsyncIterator<T>;
+  /** Iterate over items present only in current collection, not in {otherItems} iterable. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */  
+  difference<O>(
+    otherItems: AsyncIteratorOrIterable<O>, 
+    isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is
+  ) : HAsyncIterator<T>;
+  /** Iterate over items present only in current collection or only in {otherItems} iterable, but not in both. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */  
+  symmetricDifference<O>(
+    otherItems: AsyncIteratorOrIterable<O>, 
+    isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is
+  ) : HAsyncIterator<T>;
 }
 ```
-
-A few more methods has been implemented, but they're not part of the specification. See `index.ts` to see them inside the `Iterator` and `AsyncIterator` interface.

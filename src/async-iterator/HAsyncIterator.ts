@@ -2,6 +2,7 @@ import { AsyncIteratorOrIterable, IteratorSlot } from '../types';
 
 export function aiter<T, TReturn, TNext>(item: AsyncIterator<T, TReturn, TNext>): HAsyncIterator<T, TReturn, TNext>;
 export function aiter<T>(item: AsyncIterable<T>): HAsyncIterator<T>;
+export function aiter<T, TReturn = any, TNext = undefined>(iterator: AsyncIterator<T, TReturn, TNext> | AsyncIterable<T>): HAsyncIterator<T, TReturn, TNext>;
 export function aiter<T, TReturn = any, TNext = undefined>(item: AsyncIterator<T, TReturn, TNext> | AsyncIterable<T>) {
   return HAsyncIterator.from(item);
 }
@@ -472,6 +473,168 @@ export class HAsyncIterator<T, TReturn = any, TNext = undefined> implements Asyn
     return [partition1, partition2];
   }
 
+  /** Group by objects by key according to returned key for each object. */
+  async groupBy<K extends string | number | symbol>(callback: (value: T) => K | PromiseLike<K>) {
+    const grouped: { [Key in K]: T[] } = {} as any;
+
+    const it = this;
+    let value = await it.next();
+
+    while (!value.done) {
+      const real_value = value.value;
+      const key = await callback(real_value);
+
+      if (key in grouped) {
+        grouped[key].push(real_value);
+      }
+      else {
+        grouped[key] = [real_value];
+      }
+
+      value = await it.next();
+    }
+
+    return grouped;
+  }
+
+  /** Index this iterator objects in a {Map} with key obtained through {keyGetter}. */
+  async toIndexedItems<K>(keyGetter: (value: T) => K | PromiseLike<K>) {
+    const map = new Map<K, T>();
+    const it = this;
+    let value = await it.next();
+
+    while (!value.done) {
+      const realValue = value.value;
+      const key = await keyGetter(realValue);
+      map.set(key, realValue);
+
+      value = await it.next();
+    }
+
+    return map;
+  }
+
+  /** 
+   * Iterate over items present in both current collection and {otherItems} iterable. 
+   * **Warning**: This is a O(n*m) operation and this will consume {otherItems} iterator/iterable! 
+   */  
+  intersection<O>(
+    otherItems: AsyncIteratorOrIterable<O>, 
+    isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is,
+  ) : HAsyncIterator<T, TReturn, TNext> {
+    return new HAsyncIterator(HAsyncIterator.intersection.call(this, otherItems, isSameItemCallback as any)) as HAsyncIterator<T, TReturn, TNext>;
+  }
+
+  static async *intersection<T, O>(
+    this: AsyncIterator<T>, 
+    otherItems: AsyncIteratorOrIterable<O>, 
+    isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is,
+  ) {
+    const otherItemsCollection = await aiter(otherItems).toArray();
+    const it = this;
+    let value = await it.next();
+    let nextValue: unknown;
+
+    while (!value.done) {
+      const realValue = value.value;
+
+      // Yield real_value if any {item} match {real_value} 
+      if (await asyncSome(otherItemsCollection, item => isSameItemCallback(realValue, item))) {
+        nextValue = yield realValue;
+      }
+      
+      value = await it.next(nextValue as any);
+    }
+
+    return value.value;
+  }
+
+  /** 
+   * Iterate over items present only in current collection, not in {otherItems} iterable. 
+   * **Warning**: This is a O(n*m) operation and this will consume {otherItems} iterator/iterable! 
+   */
+  difference<O>(
+    otherItems: AsyncIteratorOrIterable<O>, 
+    isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is,
+  ) : HAsyncIterator<T, TReturn, TNext> {
+    return new HAsyncIterator(HAsyncIterator.difference.call(this, otherItems, isSameItemCallback as any)) as HAsyncIterator<T, TReturn, TNext>;
+  }
+
+  static async *difference<T, O>(
+    this: AsyncIterator<T>, 
+    otherItems: AsyncIteratorOrIterable<O>, 
+    isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is,
+  ) {
+    const it = this;
+    let value = await it.next();
+    const otherItemsCollection = await aiter(otherItems).toArray();
+    let nextValue: unknown;
+
+    while (!value.done) {
+      const realValue = value.value;
+
+      // Exclude real_value if any {item} match {real_value}
+      if (await asyncEvery(otherItemsCollection, async item => !(await isSameItemCallback(realValue, item)))) {
+        nextValue = yield realValue;
+      }
+      
+      value = await it.next(nextValue as any);
+    }
+
+    return value.value;
+  }
+
+  /** 
+   * Iterate over items present only in current collection or only in {otherItems} iterable, but not in both. 
+   * **Warning**: This is a O(n*m) operation and this will consume {otherItems} iterator/iterable! 
+   */
+  symmetricDifference<O>(
+    otherItems: AsyncIteratorOrIterable<O>, 
+    isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is,
+  ) : HAsyncIterator<T | O, TReturn, TNext> {
+    return new HAsyncIterator(HAsyncIterator.symmetricDifference.call(this, otherItems, isSameItemCallback as any)) as HAsyncIterator<T | O, TReturn, TNext>;
+  }
+
+  static async *symmetricDifference<T, O>(
+    this: AsyncIterator<T>, 
+    otherItems: AsyncIteratorOrIterable<O>, 
+    isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is,
+  ) {
+    const it = this;
+    let value = await it.next();
+    const otherItemsCollection = await aiter(otherItems).toArray();
+    const presentInBothCollections = new Set<O>();
+    let nextValue: unknown;
+
+    while (!value.done) {
+      const realValue = value.value;
+
+      // Try to find same item as current in {other_items_collection}
+      const otherItem = await asyncFind(otherItemsCollection, item => isSameItemCallback(realValue, item));
+
+      if (otherItem) {
+        presentInBothCollections.add(otherItem);
+      }
+      else {
+        // No match in other collection, can emit it
+        nextValue = yield realValue;
+      }
+      
+      value = await it.next(nextValue as any);
+    }
+
+    for (const item of otherItemsCollection) {
+      // Do not emit if {item} is seen in present in both collection items
+      if (presentInBothCollections.has(item)) {
+        continue;
+      }
+
+      yield item;
+    }
+
+    return value.value;
+  }
+
   /** Find the iterator index of the first element that returns a truthy value, -1 otherwise. */
   async findIndex(callback: (value: T) => boolean | PromiseLike<boolean>) {
     const it = this;
@@ -564,4 +727,30 @@ export class HAsyncIterator<T, TReturn = any, TNext = undefined> implements Asyn
   [Symbol.asyncIterator]() {
     return this;
   }
+}
+
+async function asyncFind<T>(array: T[], finder: (value: T) => boolean | PromiseLike<boolean>) {
+  for (const item of array) {
+    if (await finder(item)) {
+      return item;
+    }
+  }
+}
+
+async function asyncEvery<T>(array: T[], matcher: (value: T) => boolean | PromiseLike<boolean>) {
+  for (const item of array) {
+    if (!(await matcher(item))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+async function asyncSome<T>(array: T[], matcher: (value: T) => boolean | PromiseLike<boolean>) {
+  for (const item of array) {
+    if (await matcher(item)) {
+      return true;
+    }
+  }
+  return false;
 }
