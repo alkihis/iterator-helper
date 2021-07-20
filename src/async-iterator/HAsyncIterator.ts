@@ -573,8 +573,9 @@ export class HAsyncIterator<T, TReturn = any, TNext = undefined> implements Asyn
     while (!value.done) {
       const realValue = value.value;
 
-      // Exclude real_value if any {item} match {real_value}
-      if (await asyncEvery(otherItemsCollection, async item => !(await isSameItemCallback(realValue, item)))) {
+      // Emit {realValue} only if no value matches in other items
+      const currentItemPresentInOtherItems = await asyncSome(otherItemsCollection, item => isSameItemCallback(realValue, item));
+      if (!currentItemPresentInOtherItems) {
         nextValue = yield realValue;
       }
       
@@ -610,10 +611,10 @@ export class HAsyncIterator<T, TReturn = any, TNext = undefined> implements Asyn
       const realValue = value.value;
 
       // Try to find same item as current in {other_items_collection}
-      const otherItem = await asyncFind(otherItemsCollection, item => isSameItemCallback(realValue, item));
+      const otherItem = await asyncFindIndex(otherItemsCollection, item => isSameItemCallback(realValue, item));
 
-      if (otherItem) {
-        presentInBothCollections.add(otherItem);
+      if (otherItem !== -1) {
+        presentInBothCollections.add(otherItemsCollection[otherItem]);
       }
       else {
         // No match in other collection, can emit it
@@ -729,21 +730,13 @@ export class HAsyncIterator<T, TReturn = any, TNext = undefined> implements Asyn
   }
 }
 
-async function asyncFind<T>(array: T[], finder: (value: T) => boolean | PromiseLike<boolean>) {
-  for (const item of array) {
-    if (await finder(item)) {
-      return item;
+async function asyncFindIndex<T>(array: T[], finder: (value: T) => boolean | PromiseLike<boolean>) {
+  for (let i = 0; i < array.length; i++) {
+    if (await finder(array[i])) {
+      return i;
     }
   }
-}
-
-async function asyncEvery<T>(array: T[], matcher: (value: T) => boolean | PromiseLike<boolean>) {
-  for (const item of array) {
-    if (!(await matcher(item))) {
-      return false;
-    }
-  }
-  return true;
+  return -1;
 }
 
 async function asyncSome<T>(array: T[], matcher: (value: T) => boolean | PromiseLike<boolean>) {
