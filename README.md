@@ -137,12 +137,14 @@ interface HIterator<T, TReturn = any, TNext = undefined> {
   groupBy<K extends string | number | symbol>(callback: (value: T) => K) : { [Key in K]: T[] };
   /** Index this iterator objects in a {Map} with key obtained through {keyGetter}. */
   toIndexedItems<K>(keyGetter: (value: T) => K) : Map<K, T>;
-  /** Iterate over items present in both current collection and {otherItems} iterable. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */  
+  /** Iterate over items present in both current collection and {otherItems} iterable. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */
   intersection<O>(otherItems: IteratorOrIterable<O>, isSameItemCallback: (value: T, other: O) => boolean = Object.is) : HIterator<T>;
-  /** Iterate over items present only in current collection, not in {otherItems} iterable. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */  
+  /** Iterate over items present only in current collection, not in {otherItems} iterable. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */
   difference<O>(otherItems: IteratorOrIterable<O>, isSameItemCallback: (value: T, other: O) => boolean = Object.is) : HIterator<T>;
-  /** Iterate over items present only in current collection or only in {otherItems} iterable, but not in both. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */  
+  /** Iterate over items present only in current collection or only in {otherItems} iterable, but not in both. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */
   symmetricDifference<O>(otherItems: IteratorOrIterable<O>, isSameItemCallback: (value: T, other: O) => boolean = Object.is) : HIterator<T>;
+  /** Transform current sync iterator to an async one (wrap each new item into a resolved `Promise`) */
+  toAsyncIterator(): HAsyncIterator<T>;
 }
 
 interface HAsyncIterator<T, TReturn = any, TNext = undefined> {
@@ -201,20 +203,46 @@ interface HAsyncIterator<T, TReturn = any, TNext = undefined> {
   groupBy<K extends string | number | symbol>(callback: (value: T) => K | PromiseLike<K>) : Promise<{ [Key in K]: T[] }>;
   /** Index this iterator objects in a {Map} with key obtained through {keyGetter}. */
   toIndexedItems<K>(keyGetter: (value: T) => K | PromiseLike<K>) : Promise<Map<K, T>>;
-  /** Iterate over items present in both current collection and {otherItems} iterable. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */  
+  /** Iterate over items present in both current collection and {otherItems} iterable. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */
   intersection<O>(
-    otherItems: AsyncIteratorOrIterable<O>, 
+    otherItems: AsyncIteratorOrIterable<O>,
     isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is
   ) : HAsyncIterator<T>;
-  /** Iterate over items present only in current collection, not in {otherItems} iterable. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */  
+  /** Iterate over items present only in current collection, not in {otherItems} iterable. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */
   difference<O>(
-    otherItems: AsyncIteratorOrIterable<O>, 
+    otherItems: AsyncIteratorOrIterable<O>,
     isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is
   ) : HAsyncIterator<T>;
-  /** Iterate over items present only in current collection or only in {otherItems} iterable, but not in both. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */  
+  /** Iterate over items present only in current collection or only in {otherItems} iterable, but not in both. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */
   symmetricDifference<O>(
-    otherItems: AsyncIteratorOrIterable<O>, 
+    otherItems: AsyncIteratorOrIterable<O>,
     isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is
   ) : HAsyncIterator<T>;
+}
+```
+
+## Helpers
+
+`iter` function expose some iterator creator helpers:
+
+- `range`
+- `repeat`
+
+There's presented as TypeScript types.
+
+```ts
+// iter is instance of IIterFunction
+interface IIterFunction {
+  /** Create a new range `HIterator` from {0} to {stop}, 1 by 1. If {stop} is negative, it goes -1 by -1. */
+  range(stop: number): HIterator<number>;
+  /** Create a new range `HIterator` from {start} to {stop}, 1 by 1. If {stop} < {start}, it goes -1 by -1. */
+  range(start: number, stop: number): HIterator<number>;
+  /** Create a new range `HIterator` from {start} to {stop}, adding {step} at each step. */
+  range(start: number, stop: number, step: number): HIterator<number>;
+
+  /** Create a new `HIterator` that emit only {item} indefinitively. */
+  repeat<I>(item: I): HIterator<I>;
+  /** Create a new `HIterator` that emit only {item}, {times} times. */
+  repeat<I>(item: I, times: number): HIterator<I>;
 }
 ```
