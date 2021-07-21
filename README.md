@@ -865,3 +865,50 @@ aiter(numbers())
   .symmetricDifference(iter([3, 4, 5]).toAsyncIterator()) 
   .toArray() // Promise<[1, 2, 4, 5]>
 ```
+
+
+### Iterator creators
+
+#### `iter.range`
+
+Create a range iterator (`HIterator` instance) from:
+- 0 to `stop` if only `stop` is specified, from (-)1 by (-)1.
+- `start` to `stop`, from (-)1 by (-)1 or from `step` to `step`
+
+```ts
+for (const i of iter.range(10)) {
+  // i goes from 0 to 9 included, 1 by 1.
+}
+
+for (const i of iter.range(0, 10, 2)) {
+  // i takes 0, 2, 4, 6, 8 as value
+}
+
+for (const i of iter.range(1, 10)) {
+  // i goes from 1 to 9 included, 1 by 1.
+}
+
+for (const i of iter.range(-10)) {
+  // i goes from 0 to -9 included, -1 by -1.
+}
+
+for (const i of iter.range(20, 10)) {
+  // i goes from 20 to 11 included, -1 by -1.
+}
+```
+
+#### `iter.repeat`
+
+Create an finite or infinite iterator that constantly yield the same thing.
+
+```ts
+iter.repeat({ id: 1 }) // Will yield { id: 1 } indefinitively
+// or
+iter.repeat({ id: 1 }, 5) // Will yield { id: 1 } 5 times, then stops
+``` 
+this is equal to this code:
+```ts
+iter([{ id: 1 }]).cycle()
+// or
+iter([{ id: 1 }]).cycle().take(5)
+```
