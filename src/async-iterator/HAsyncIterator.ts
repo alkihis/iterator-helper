@@ -611,10 +611,10 @@ export class HAsyncIterator<T, TReturn = any, TNext = undefined> implements Asyn
       const realValue = value.value;
 
       // Try to find same item as current in {other_items_collection}
-      const otherItem = await asyncFindIndex(otherItemsCollection, item => isSameItemCallback(realValue, item));
+      const otherItemIndex = await asyncFindIndex(otherItemsCollection, item => isSameItemCallback(realValue, item));
 
-      if (otherItem !== -1) {
-        presentInBothCollections.add(otherItemsCollection[otherItem]);
+      if (otherItemIndex !== -1) {
+        presentInBothCollections.add(otherItemsCollection[otherItemIndex]);
       }
       else {
         // No match in other collection, can emit it
