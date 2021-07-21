@@ -1,13 +1,6 @@
 import { HAsyncIterator } from '../async-iterator';
 import { IteratorOrIterable, IteratorSlot } from '../types';
 
-export function iter<T, TReturn, TNext>(item: Iterator<T, TReturn, TNext>): HIterator<T, TReturn, TNext>;
-export function iter<T>(item: Iterable<T>): HIterator<T>;
-export function iter<T, TReturn = any, TNext = undefined>(iterator: Iterator<T, TReturn, TNext> | Iterable<T>): HIterator<T, TReturn, TNext>;
-export function iter<T, TReturn = any, TNext = undefined>(item: Iterator<T, TReturn, TNext> | Iterable<T>) {
-  return HIterator.from(item);
-}
-
 export class HIterator<T, TReturn = any, TNext = undefined> implements Iterator<T, TReturn, TNext> {
   [IteratorSlot]: Iterator<T, TReturn, TNext>;
 
@@ -354,24 +347,31 @@ export class HIterator<T, TReturn = any, TNext = undefined> implements Iterator<
       }
       else {
         // If its not an iterable, make it one
-        yield* iter(it);
+        yield* HIterator.from(it);
       }
     }
   }
 
   /** Iterate through multiple iterators together. */
-  zip<O>(...others: IterableIterator<O>[]) : HIterator<(T | O)[], TReturn, TNext> {
+  zip<O>(other: IteratorOrIterable<O>) : HIterator<[T, O][], TReturn, TNext>;
+  zip<O>(...others: IteratorOrIterable<O>[]) : HIterator<(T | O)[], TReturn, TNext>;
+  zip<O>(...others: IteratorOrIterable<O>[]) : HIterator<(T | O)[], TReturn, TNext> {
     return new HIterator(HIterator.zip.apply(this, others)) as HIterator<(T | O)[], TReturn, TNext>;
   }
 
-  static *zip<T, O>(this: Iterator<T>, ...others: IterableIterator<O>[]) : Iterator<(T | O)[]> {
-    const it_array = [this, ...others].map((e: any) => Symbol.iterator in e ? e[Symbol.iterator]() : e as Iterator<T | O>);
-    let values = it_array.map(e => e.next());
-    let next_value: any;
+  static *zip<T, O>(this: Iterator<T>, ...others: IteratorOrIterable<O>[]) : Iterator<(T | O)[]> {
+    const iterators = [this, ...others]
+      .map((e: IteratorOrIterable<T | O>) =>
+        Symbol.iterator in e
+          ? (e as Iterable<T | O>)[Symbol.iterator]()
+          : e as Iterator<T | O>
+      );
+    let values = iterators.map(e => e.next());
+    let nextValue: any;
 
     while (values.every(e => !e.done)) {
-      next_value = yield values.map(e => e.value);
-      values = it_array.map(e => e.next(next_value));
+      nextValue = yield values.map(e => e.value);
+      values = iterators.map(e => e.next(nextValue));
     }
   }
 
@@ -513,23 +513,23 @@ export class HIterator<T, TReturn = any, TNext = undefined> implements Iterator<
     return map;
   }
 
-  /** 
-   * Iterate over items present in both current collection and {otherItems} iterable. 
-   * **Warning**: This is a O(n*m) operation and this will consume {otherItems} iterator/iterable! 
-   */  
+  /**
+   * Iterate over items present in both current collection and {otherItems} iterable.
+   * **Warning**: This is a O(n*m) operation and this will consume {otherItems} iterator/iterable!
+   */
   intersection<O>(
-    otherItems: IteratorOrIterable<O>, 
+    otherItems: IteratorOrIterable<O>,
     isSameItemCallback: (value: T, other: O) => boolean = Object.is,
   ) : HIterator<T, TReturn, TNext> {
     return new HIterator(HIterator.intersection.call(this, otherItems, isSameItemCallback as any)) as HIterator<T, TReturn, TNext>;
   }
 
   static *intersection<T, O>(
-    this: Iterator<T>, 
-    otherItems: IteratorOrIterable<O>, 
+    this: Iterator<T>,
+    otherItems: IteratorOrIterable<O>,
     isSameItemCallback: (value: T, other: O) => boolean = Object.is,
   ) {
-    const otherItemsCollection = iter(otherItems).toArray();
+    const otherItemsCollection = HIterator.from(otherItems).toArray();
     const it = this;
     let value = it.next();
     let nextValue: unknown;
@@ -537,36 +537,36 @@ export class HIterator<T, TReturn = any, TNext = undefined> implements Iterator<
     while (!value.done) {
       const realValue = value.value;
 
-      // Yield realValue if any {item} match {realValue} 
+      // Yield realValue if any {item} match {realValue}
       if (otherItemsCollection.some(item => isSameItemCallback(realValue, item))) {
         nextValue = yield realValue;
       }
-      
+
       value = it.next(nextValue as any);
     }
 
     return value.value;
   }
 
-  /** 
-   * Iterate over items present only in current collection, not in {otherItems} iterable. 
-   * **Warning**: This is a O(n*m) operation and this will consume {otherItems} iterator/iterable! 
+  /**
+   * Iterate over items present only in current collection, not in {otherItems} iterable.
+   * **Warning**: This is a O(n*m) operation and this will consume {otherItems} iterator/iterable!
    */
   difference<O>(
-    otherItems: IteratorOrIterable<O>, 
+    otherItems: IteratorOrIterable<O>,
     isSameItemCallback: (value: T, other: O) => boolean = Object.is,
   ) : HIterator<T, TReturn, TNext> {
     return new HIterator(HIterator.difference.call(this, otherItems, isSameItemCallback as any)) as HIterator<T, TReturn, TNext>;
   }
 
   static *difference<T, O>(
-    this: Iterator<T>, 
-    otherItems: IteratorOrIterable<O>, 
+    this: Iterator<T>,
+    otherItems: IteratorOrIterable<O>,
     isSameItemCallback: (value: T, other: O) => boolean = Object.is,
   ) {
     const it = this;
     let value = it.next();
-    const otherItemsCollection = iter(otherItems).toArray();
+    const otherItemsCollection = HIterator.from(otherItems).toArray();
     let nextValue: unknown;
 
     while (!value.done) {
@@ -576,32 +576,32 @@ export class HIterator<T, TReturn = any, TNext = undefined> implements Iterator<
       if (otherItemsCollection.every(item => !isSameItemCallback(realValue, item))) {
         nextValue = yield realValue;
       }
-      
+
       value = it.next(nextValue as any);
     }
 
     return value.value;
   }
 
-  /** 
-   * Iterate over items present only in current collection or only in {otherItems} iterable, but not in both. 
-   * **Warning**: This is a O(n*m) operation and this will consume {otherItems} iterator/iterable! 
+  /**
+   * Iterate over items present only in current collection or only in {otherItems} iterable, but not in both.
+   * **Warning**: This is a O(n*m) operation and this will consume {otherItems} iterator/iterable!
    */
   symmetricDifference<O>(
-    otherItems: IteratorOrIterable<O>, 
+    otherItems: IteratorOrIterable<O>,
     isSameItemCallback: (value: T, other: O) => boolean = Object.is,
   ) : HIterator<T | O, TReturn, TNext> {
     return new HIterator(HIterator.symmetricDifference.call(this, otherItems, isSameItemCallback as any)) as HIterator<T | O, TReturn, TNext>;
   }
 
   static *symmetricDifference<T, O>(
-    this: Iterator<T>, 
-    otherItems: IteratorOrIterable<O>, 
+    this: Iterator<T>,
+    otherItems: IteratorOrIterable<O>,
     isSameItemCallback: (value: T, other: O) => boolean = Object.is,
   ) {
     const it = this;
     let value = it.next();
-    const otherItemsCollection = iter(otherItems).toArray();
+    const otherItemsCollection = HIterator.from(otherItems).toArray();
     const presentInBothCollections = new Set<O>();
     let nextValue: unknown;
 
@@ -618,7 +618,7 @@ export class HIterator<T, TReturn = any, TNext = undefined> implements Iterator<
         // No match in other collection, can emit it
         nextValue = yield realValue;
       }
-      
+
       value = it.next(nextValue as any);
     }
 
@@ -728,7 +728,7 @@ export class HIterator<T, TReturn = any, TNext = undefined> implements Iterator<
 
   /** Convert given iterator to a async generator instance. */
   static async *toAsyncIterator<T, TReturn = any, TNext = undefined>(iterator: IteratorOrIterable<T>): AsyncGenerator<T, TReturn, TNext> {
-    const it = iter(iterator);
+    const it = HIterator.from(iterator);
     let value = it.next();
     let nextValue: unknown;
 
