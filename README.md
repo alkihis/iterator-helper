@@ -482,144 +482,386 @@ iter([1, 2, 3])
   .toArray() // [[1, 4], [2, 5], [3, 6]]
 ```
 
+#### `.takeWhile(callback: (value: T) => boolean) : HIterator<T>`
+
+Continue iterator until `callback` return a falsy value.
 ```ts
-interface HIterator<T, TReturn = any, TNext = undefined> {
-  /** Continue iterator until {callback} return a falsy value. */
-  takeWhile(callback: (value: T) => boolean) : HIterator<T>;
+iter([1, 2, 3])
+  .takeWhile(item => item / 2 > 1)
+  .toArray() // [1, 2]
+```
 
-  /** Skip elements until {callback} return a truthy value. */
-  dropWhile(callback: (value: T) => boolean) : HIterator<T>;
+#### `.dropWhile(callback: (value: T) => boolean) : HIterator<T>`
 
-  /** Continue iterator until `null` or `undefined` is encountered. */
-  fuse() : HIterator<T>;
+Skip elements until `callback` return a truthy value.
+```ts
+iter([1, 2, 3])
+  .dropWhile(item => item / 2 <= 1)
+  .toArray() // [3]
+```
 
-  /** Partition {true} elements to first array, {false} elements to second one. */
-  partition(callback: (value: T) => boolean) : [T[], T[]];
+#### `.fuse() : HIterator<T>`
 
-  /** Only works if it is a number iterator. Returns the maximum of iterator. */
-  max() : number;
+Continue iterator until `null` or `undefined` is encountered.
+```ts
+iter([1, 2, 3, undefined])
+  .fuse()
+  .toArray() // [1, 2, 3]
+```
 
-  /** Only works if it is a number iterator. Returns the minimum of iterator. */
-  min() : number;
+#### `.partition(callback: (value: T) => boolean) : [T[], T[]]`
 
-  /** When iterator ends, go back to the first item then loop. Indefinitively. */
-  cycle() : HIterator<T>;
+Partition `true` elements to first array, `false` elements to second one.
+```ts
+iter([1, 2, 3]).partition(item => item % 2 === 0) // [[2], [1, 3]]
+```
 
-  /** Group by objects by key according to returned key for each object. */
-  groupBy<K extends string | number | symbol>(callback: (value: T) => K) : { [Key in K]: T[] };
+#### `.max() : number`
 
-  /** Index this iterator objects in a {Map} with key obtained through {keyGetter}. */
-  toIndexedItems<K>(keyGetter: (value: T) => K) : Map<K, T>;
+Only works if it is a number iterator. Returns the maximum of iterator.
+```ts
+iter([1, 2, 3]).max() // 3
+```
 
-  /** Iterate over items present in both current collection and {otherItems} iterable. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */
-  intersection<O>(otherItems: IteratorOrIterable<O>, isSameItemCallback: (value: T, other: O) => boolean = Object.is) : HIterator<T>;
+#### `.min() : number`
 
-  /** Iterate over items present only in current collection, not in {otherItems} iterable. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */
-  difference<O>(otherItems: IteratorOrIterable<O>, isSameItemCallback: (value: T, other: O) => boolean = Object.is) : HIterator<T>;
+Only works if it is a number iterator. Returns the minimum of iterator.
+```ts
+iter([1, 2, 3]).min() // 1
+```
 
-  /** Iterate over items present only in current collection or only in {otherItems} iterable, but not in both. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */
-  symmetricDifference<O>(otherItems: IteratorOrIterable<O>, isSameItemCallback: (value: T, other: O) => boolean = Object.is) : HIterator<T>;
+#### `.cycle() : HIterator<T>`
 
-  /** Transform current sync iterator to an async one (wrap each new item into a resolved `Promise`) */
-  toAsyncIterator(): HAsyncIterator<T>;
-}
+When iterator ends, go back to the first item then loop. Indefinitively.
+```ts
+iter([1, 2, 3])
+  .cycle()
+  .take(6)
+  .toArray() // [1, 2, 3, 1, 2, 3]
+```
 
-interface HAsyncIterator<T, TReturn = any, TNext = undefined> {
-  /** Map each value of iterator to another value via {callback}. */
-  map<R>(callback: (value: T) => R | PromiseLike<R>) : HAsyncIterator<R, TReturn, TNext>;
+#### `.groupBy<K extends string | number | symbol>(callback: (value: T) => K) : { [Key in K]: T[] }`
 
-  /** Each value is given through {callback}, return `true` if value is needed into returned iterator. */
-  filter(callback: (value: T) => boolean | PromiseLike<boolean>) : HAsyncIterator<T, TReturn, TNext>;
+Group by objects by key according to returned key for each object.
+```ts
+iter([1, 2, 3]).groupBy(item => item % 2 === 0 ? 'even' : 'odd') // { even: [2], odd: [1, 3] }
+```
 
-  /** Create a new iterator that consume {limit} items, then stops. */
-  take(limit: number) : HAsyncIterator<T, TReturn, TNext>;
+#### `.toIndexedItems<K>(keyGetter: (value: T) => K) : Map<K, T>`
 
-  /** Create a new iterator that skip {limit} items from source iterator, then yield all values. */
-  drop(limit: number) : HAsyncIterator<T, TReturn, TNext>;
+Index this iterator objects in a `Map` with key obtained through `keyGetter`.
+```ts
+iter([1, 2, 3]).toIndexedItems(item => `key-${item}`) // Map<{ 'key-1': 1, 'key-2': 2, 'key-3': 3 }>
+```
 
-  /** Get a pair [index, value] for each remaining value of iterable. */
-  asIndexedPairs() : HAsyncIterator<[number, T], TReturn, TNext>;
+#### `.intersection<O>(otherItems: IteratorOrIterable<O>, isSameItemCallback: (value: T, other: O) => boolean = Object.is) : HIterator<T>`
 
-  /** Like map, but you can return a new iterator that will be flattened. */
-  flatMap<R>(mapper: (value: T) => AsyncIterator<R> | R) : HAsyncIterator<R, TReturn, TNext>;
+Iterate over items present in both current collection and `otherItems` iterable. `O(n*m)` operation that will consume `otherItems` iterator/iterable!
+```ts
+iter([1, 2, 3])
+  .intersection([3, 4, 5]) // equivalent to .intersection([3, 4, 5], (a, b) => Object.is(a, b))
+  .toArray() // [3]
+```
 
-  /** Find a specific value that returns `true` in {callback}, and return it. Returns `undefined` otherwise. */
-  find(callback: (value: T) => boolean | PromiseLike<boolean>) : Promise<T | undefined>;
+#### `.difference<O>(otherItems: IteratorOrIterable<O>, isSameItemCallback: (value: T, other: O) => boolean = Object.is) : HIterator<T>`
 
-  /** Return `true` if each value of iterator validate {callback}. */
-  every(callback: (value: T) => boolean | PromiseLike<boolean>) : Promise<boolean>;
+Iterate over items present only in current collection, not in `otherItems` iterable. `O(n*m)` operation that will consume `otherItems` iterator/iterable!
+```ts
+iter([1, 2, 3])
+  .difference([3, 4, 5]) // equivalent to .difference([3, 4, 5], (a, b) => Object.is(a, b))
+  .toArray() // [1, 2]
+```
 
-  /** Return `true` if one value of iterator validate {callback}. */
-  some(callback: (value: T) => boolean | PromiseLike<boolean>) : Promise<boolean>;
+#### `.symmetricDifference<O>(otherItems: IteratorOrIterable<O>, isSameItemCallback: (value: T, other: O) => boolean = Object.is) : HIterator<T>`
 
-  /** Consume iterator and collapse values inside an array. */
-  toArray(maxCount?: number) : Promise<T[]>;
+Iterate over items present only in current collection or only in `otherItems` iterable. `O(n*m)` operation that will consume `otherItems` iterator/iterable!
+```ts
+iter([1, 2, 3])
+  .symmetricDifference([3, 4, 5]) // equivalent to .symmetricDifference([3, 4, 5], (a, b) => Object.is(a, b))
+  .toArray() // [1, 2, 4, 5]
+```
 
-  /** Accumulate each item inside **acc** for each value **value**. */
-  reduce<V>(reducer: (acc: V, value: T) => V | PromiseLike<V>, initialValue?: V) : Promise<V>;
+#### `.toAsyncIterator(): HAsyncIterator<T>`
 
-  /** Iterate over each value of iterator by calling **callback** for each value. */
-  forEach(callback: (value: T) => any) : Promise<void>;
+Transform current sync iterator to an async one (wrap each new item into a resolved `Promise`).
+See below for available `HAsyncIterator` methods.
 
-  /** End the iterator and return the number of remaining items. */
-  count() : Promise<number>;
+```ts
+iter([1, 2, 3]).toAsyncIterator() // HAsyncIterator<1 | 2 | 3>
+```
 
-  /** Join all the remaining elements of the iterator in a single string with glue {glue}. */
-  join(glue: string) : Promise<string>;
+### Async iterators
 
-  /** Iterate through current iterator, then through the given iterators in the correct order. */
-  chain<I>(...iterables: AsyncIteratorOrIterable<I>[]) : HAsyncIterator<T | I>;
+Async iterators uses the `HAsyncIterator` class/instances.
 
-  /** Iterate through multiple iterators together. */
-  zip<O>(...others: AsyncIteratorOrIterable<O>[]) : HAsyncIterator<(T | O)[]>;
-
-  /** Continue iterator until {callback} return a falsy value. */
-  takeWhile(callback: (value: T) => boolean | PromiseLike<boolean>) : HAsyncIterator<T>;
-
-  /** Skip elements until {callback} return a truthy value. */
-  dropWhile(callback: (value: T) => boolean | PromiseLike<boolean>) : HAsyncIterator<T>;
-
-  /** Continue iterator until `null` or `undefined` is encountered. */
-  fuse() : HAsyncIterator<T>;
-
-  /** Partition {true} elements to first array, {false} elements to second one. */
-  partition(callback: (value: T) => boolean | PromiseLike<boolean>) : Promise<[T[], T[]]>;
-
-  /** Find the iterator index of the first element that returns a truthy value, -1 otherwise. */
-  findIndex(callback: (value: T) => boolean | PromiseLike<boolean>) : Promise<number>;
-
-  /** Only works if it. is a number iterator. Returns the maximum of iterator. */
-  max() : Promise<number>;
-
-  /** Only works if it. is a number iterator. Returns the minimum of iterator. */
-  min() : Promise<number>;
-
-  /** When iterator ends, go back to the first item then loop. Indefinitively. */
-  cycle() : HAsyncIterator<T>;
-
-  /** Group by objects by key according to returned key for each object. */
-  groupBy<K extends string | number | symbol>(callback: (value: T) => K | PromiseLike<K>) : Promise<{ [Key in K]: T[] }>;
-
-  /** Index this iterator objects in a {Map} with key obtained through {keyGetter}. */
-  toIndexedItems<K>(keyGetter: (value: T) => K | PromiseLike<K>) : Promise<Map<K, T>>;
-
-  /** Iterate over items present in both current collection and {otherItems} iterable. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */
-  intersection<O>(
-    otherItems: AsyncIteratorOrIterable<O>,
-    isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is
-  ) : HAsyncIterator<T>;
-
-  /** Iterate over items present only in current collection, not in {otherItems} iterable. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */
-  difference<O>(
-    otherItems: AsyncIteratorOrIterable<O>,
-    isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is
-  ) : HAsyncIterator<T>;
-
-  /** Iterate over items present only in current collection or only in {otherItems} iterable, but not in both. `O(n*m)` operation that will consume {otherItems} iterator/iterable! */
-  symmetricDifference<O>(
-    otherItems: AsyncIteratorOrIterable<O>,
-    isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is
-  ) : HAsyncIterator<T>;
+> **Notice**: The following async generator will be used in all async examples:
+```ts
+async function* numbers() {
+  yield 1;
+  yield 2;
+  yield 3;
 }
 ```
 
+> **Notice**: In most of the cases, when a method takes a callback, the return value can be either a value **or a `Promise`**. If its a `Promise`, it will be awaited.
+
+#### `aiter` (module function)
+
+Create the iterator wrapper `HAsyncIterator` from an `AsyncIterable` (objects with `Symbol.asyncIterator` defined) or an `AsyncIterator` (`AsyncGenerator` instance, user-land async iterator, ...).
+
+```ts
+import { aiter } from 'iterator-helper'
+
+// From an async iterable
+aiter({ 
+  async *[Symbol.asyncIterator]() {
+    yield* numbers();
+  } 
+}) // => HAsyncIterator<1 | 2 | 3>
+
+// From an iterator
+aiter(numbers()) // => HAsyncIterator<1 | 2 | 3>
+```
+
+#### `.from` (static method)
+
+Do the same as `aiter` function call. `HAsyncIterator.from(numbers())` produces the same result as `aiter(numbers())`.
+
+#### `.map<R>(callback: (value: T) => R | PromiseLike<R>) : HAsyncIterator<R, TReturn, TNext>`
+
+Transform each item of iterator to another value through the result of `callback(item)`.
+```ts
+aiter(numbers())
+  .map(item => item * 2)
+  .toArray() // Promise<[2, 4, 6]>
+```
+
+#### `.filter(callback: (value: T) => boolean | PromiseLike<boolean>) : HAsyncIterator<T, TReturn, TNext>`
+
+Do not yield item of iterator if `callback(item)` is falsy.
+```ts
+aiter(numbers())
+  .filter(item => item % 2 !== 0)
+  .toArray() // Promise<[1, 3]>
+```
+
+#### `.take(limit: number) : HAsyncIterator<T, TReturn, TNext>`
+
+Create a new iterator that consume `limit` items, then stops.
+```ts
+aiter(numbers())
+  .take(2)
+  .toArray() // Promise<[1, 2]>
+```
+
+#### `.drop(limit: number) : HAsyncIterator<T, TReturn, TNext>`
+
+Create a new iterator that ignore `limit` items from being yielded, then continue the iterator as it used to be.
+```ts
+aiter(numbers())
+  .drop(2)
+  .toArray() // Promise<[3]>
+```
+
+#### `.asIndexedPairs() : HAsyncIterator<[number, T], TReturn, TNext>`
+
+Get a pair `[index, value]` for each value of an iterator.
+```ts
+aiter(numbers())
+  .asIndexedPairs()
+  .toArray() // Promise<[[0, 1], [1, 2], [2, 3]]>
+```
+
+#### `.flatMap<R>(mapper: (value: T) => AsyncIterator<R> | R) : HAsyncIterator<R, TReturn, TNext>`
+
+Like map, but you can return a new iterator that will be flattened.
+```ts
+aiter(numbers())
+  .flatMap(item => iter.range(item).toAsyncIterator())
+  .toArray() // Promise<[0, 0, 1, 0, 1, 2]>
+```
+
+#### `.find(callback: (value: T) => boolean | PromiseLike<boolean>) : Promise<T | undefined>`
+
+Find a specific item that returns `true` in `callback(item)`, and return it. Returns `undefined` otherwise.
+```ts
+aiter(numbers()).find(item => item % 2 === 0) // Promise<2>
+aiter(numbers()).find(item => item % 2 === 4) // Promise<undefined>
+```
+
+#### `.findIndex(callback: (value: T) => boolean | PromiseLike<boolean>) : Promise<number>`
+
+Find a specific item that returns `true` in `callback(item)`, and return its index. Returns `-1` otherwise.
+```ts
+aiter(numbers()).findIndex(item => item % 2 === 0) // Promise<1>
+aiter(numbers()).findIndex(item => item % 2 === 4) // Promise<-1>
+```
+
+#### `.every(callback: (value: T) => boolean | PromiseLike<boolean>) : Promise<boolean>`
+
+Return `true` if each item of iterator validate `callback(item)`.
+```ts
+aiter(numbers()).every(item => item > 0) // Promise<true>
+```
+
+#### `.some(callback: (value: T) => boolean | PromiseLike<boolean>) : Promise<boolean>`
+
+Return `true` if at least one item of iterator validate `callback(item)`.
+```ts
+aiter(numbers()).every(item => item > 2) // Promise<true>
+```
+
+#### `.toArray(maxCount?: number) : Promise<T[]>`
+
+Consume iterator (up to `maxCount` items, default to infinity) and collapse values inside an array.
+```ts
+aiter(numbers()).toArray() // Promise<[1, 2, 3]>
+```
+
+#### `.reduce<V>(reducer: (acc: V, value: T) => V | PromiseLike<V>, initialValue?: V) : Promise<V>`
+
+Accumulate each item inside `acc` for each value `value`.
+```ts
+aiter(numbers()).reduce((acc, value) => acc + value) // Promise<6>
+```
+
+#### `.forEach(callback: (value: T) => any) : Promise<void>`
+
+Iterate over each value of iterator by calling `callback` for each item.
+```ts
+aiter(numbers()).forEach(console.log.bind(console)) // Logs 1, then 2, then 3
+```
+
+#### `.count() : Promise<number>`
+
+End the iterator and return the number of counted items.
+```ts
+aiter(numbers()).count() // Promise<3>
+```
+
+#### `.join(glue: string) : Promise<string>`
+
+Join all the remaining elements of the iterator in a single glue string `glue`.
+```ts
+aiter(numbers()).join(', ') // Promise<'1, 2, 3'>
+```
+
+#### `.chain<I>(...iterables: AsyncIteratorOrIterable<I>[]) : HAsyncIterator<T | I>`
+
+Iterate through current iterator, then through the given iterators in the correct order.
+```ts
+aiter(numbers())
+  .chain(iter([4, 5, 6]).toAsyncIterator())
+  .toArray() // Promise<[1, 2, 3, 4, 5, 6]>
+```
+
+#### `.zip<O>(...others: AsyncIteratorOrIterable<O>[]) : HAsyncIterator<(T | O)[]>`
+
+Iterate through multiple iterators together.
+```ts
+aiter(numbers())
+  .zip(iter([4, 5, 6]).toAsyncIterator()])
+  .toArray() // Promise<[[1, 4], [2, 5], [3, 6]]>
+```
+
+#### `.takeWhile(callback: (value: T) => boolean | PromiseLike<boolean>) : HAsyncIterator<T>`
+
+Continue iterator until `callback` return a falsy value.
+```ts
+aiter(numbers())
+  .takeWhile(item => item / 2 > 1)
+  .toArray() // Promise<[1, 2]>
+```
+
+#### `.dropWhile(callback: (value: T) => boolean | PromiseLike<boolean>) : HAsyncIterator<T>`
+
+Skip elements until `callback` return a truthy value.
+```ts
+aiter(numbers())
+  .dropWhile(item => item / 2 <= 1)
+  .toArray() // Promise<[3]>
+```
+
+#### `.fuse() : HAsyncIterator<T>`
+
+Continue iterator until `null` or `undefined` is encountered.
+```ts
+iter([1, 2, 3, undefined])
+  .toAsyncIterator()
+  .fuse()
+  .toArray() // Promise<[1, 2, 3]>
+```
+
+#### `.partition(callback: (value: T) => boolean | PromiseLike<boolean>) : Promise<[T[], T[]]>`
+
+Partition `true` elements to first array, `false` elements to second one.
+```ts
+aiter(numbers()).partition(item => item % 2 === 0) // Promise<[[2], [1, 3]]>
+```
+
+#### `.max() : Promise<number>`
+
+Only works if it is a number iterator. Returns the maximum of iterator.
+```ts
+aiter(numbers())).max() // Promise<3>
+```
+
+#### `.min() : Promise<number>`
+
+Only works if it is a number iterator. Returns the minimum of iterator.
+```ts
+aiter(numbers()).min() // Promise<1>
+```
+
+#### `.cycle() : HAsyncIterator<T>`
+
+When iterator ends, go back to the first item then loop. Indefinitively.
+```ts
+aiter(numbers())
+  .cycle()
+  .take(6)
+  .toArray() // Promise<[1, 2, 3, 1, 2, 3]>
+```
+
+#### `.groupBy<K extends string | number | symbol>(callback: (value: T) => K | PromiseLike<K>) : Promise<{ [Key in K]: T[] }>`
+
+Group by objects by key according to returned key for each object.
+```ts
+aiter(numbers())
+  .groupBy(item => item % 2 === 0 ? 'even' : 'odd') // Promise<{ even: [2], odd: [1, 3] }>
+```
+
+#### `.toIndexedItems<K>(keyGetter: (value: T) => K | PromiseLike<K>) : Promise<Map<K, T>>`
+
+Index this iterator objects in a `Map` with key obtained through `keyGetter`.
+```ts
+aiter(numbers())
+  .toIndexedItems(item => `key-${item}`) // Promise<Map<{ 'key-1': 1, 'key-2': 2, 'key-3': 3 }>>
+```
+
+#### `.intersection<O>(otherItems: AsyncIteratorOrIterable<O>, isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is) : HAsyncIterator<T>`
+
+Iterate over items present in both current collection and `otherItems` iterable. `O(n*m)` operation that will consume `otherItems` iterator/iterable!
+```ts
+aiter(numbers())
+  .intersection(iter([3, 4, 5]).toAsyncIterator())
+  .toArray() // Promise<[3]>
+```
+
+#### `.difference<O>(otherItems: AsyncIteratorOrIterable<O>, isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is) : HAsyncIterator<T>`
+
+Iterate over items present only in current collection, not in `otherItems` iterable. `O(n*m)` operation that will consume `otherItems` iterator/iterable!
+```ts
+aiter(numbers())
+  .difference(iter([3, 4, 5]).toAsyncIterator())
+  .toArray() // Promise<[1, 2]>
+```
+
+#### `.symmetricDifference<O>(otherItems: AsyncIteratorOrIterable<O>, isSameItemCallback: (value: T, other: O) => boolean | PromiseLike<boolean> = Object.is) : HAsyncIterator<T>`
+
+Iterate over items present only in current collection or only in `otherItems` iterable. `O(n*m)` operation that will consume `otherItems` iterator/iterable!
+```ts
+aiter(numbers())
+  .symmetricDifference(iter([3, 4, 5]).toAsyncIterator()) 
+  .toArray() // Promise<[1, 2, 4, 5]>
+```
